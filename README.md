@@ -16,7 +16,7 @@ The Philippines has over 12,000 Republic Acts with overlapping themes. There is 
 
 ## Team
 - Francia, L. A.
-- Griño, S.
+- Griño, S. R.
 - Pesquisa, J.
 
 ## Architecture
