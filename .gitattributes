@@ -1,0 +1,40 @@
+# Default: normalize to LF on commit, no conversion on checkout
+* text=auto eol=lf
+
+# Explicit text files
+*.py      text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.sql     text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.toml    text eol=lf
+*.cfg     text eol=lf
+*.ini     text eol=lf
+*.sh      text eol=lf
+*.env*    text eol=lf
+Dockerfile text eol=lf
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# Windows-specific files
+*.bat     text eol=crlf
+*.ps1     text eol=crlf
+*.cmd     text eol=crlf
+
+# Binary — never touch
+*.parquet binary
+*.png     binary
+*.jpg     binary
+*.pdf     binary
+*.zip     binary
+
+# Data — treat as binary (avoid diff churn)
+data/raw/**     -text
+data/staging/** -text
+data/curated/** -text
+
+# Linguist — hide data/docs from language stats
+data/**        linguist-vendored
+docs/**        linguist-documentation
+notebooks/**   linguist-documentation

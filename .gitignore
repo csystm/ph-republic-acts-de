@@ -33,3 +33,12 @@ Thumbs.db
 # Secrets
 *.pem
 *.key
+
+# Atomic-write temp files
+*.part
+*.parquet.part
+*.csv.part
+*.json.part
+
+# Scratch
+data/_scratch/

@@ -28,6 +28,15 @@ The Philippines has over 12,000 Republic Acts with overlapping themes. There is 
 ## Setup and Installation
 [Placeholder]
 
+## Configuration
+
+- Locally, `Settings` falls back to `<repo>/data` when `DATA_DIR` is unset.
+  Do **not** set `DATA_DIR` in your local `.env`.
+- Inside Docker, `docker-compose.yml` sets `DATA_DIR=/opt/airflow/data`,
+  which is bind-mounted to `./data`.
+- `.env.example` documents the container-side value; keep it in sync
+  whenever new env vars are added to `Settings`.
+
 ## How to Run
 [Placeholder]
 
