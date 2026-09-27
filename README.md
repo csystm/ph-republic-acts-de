@@ -37,6 +37,10 @@ The Philippines has over 12,000 Republic Acts with overlapping themes. There is 
 - `.env.example` documents the container-side value; keep it in sync
   whenever new env vars are added to `Settings`.
 
+### On committing `ra_master.parquet`
+
+The curated Parquet is checked in alongside the source code. This is a deliberate choice for a course submission — it guarantees the graded artifact is inspectable without rerunning ingestion (which requires network access to HuggingFace and Lawphil). In a production deployment this file would live in object storage (S3/GCS) or be managed via DVC/Git LFS. The 33MB size is well within GitHub's limits.
+
 ## How to Run
 [Placeholder]
 
