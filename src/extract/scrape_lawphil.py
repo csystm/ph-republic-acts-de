@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 from src.utils.config import settings
 from src.utils.logger import get_logger
 
+from src.utils.io import atomic_write_text, atomic_write_json
+
 import unicodedata
 
 logger = get_logger(__name__)
@@ -88,7 +90,7 @@ def scrape_lawphil_sample(
     index_url = settings.lawphil_index_url
     logger.info("Fetching index: %s", index_url)
     index_html = fetch_html(index_url)
-    (out_dir / "_index.html").write_text(index_html, encoding="utf-8")
+    atomic_write_text(index_html, out_dir / "_index.html")
 
     entries = parse_index(index_html, index_url)
     logger.info("Parsed %d RA entries from index", len(entries))
@@ -100,9 +102,7 @@ def scrape_lawphil_sample(
     sample = rng.sample(entries, min(sample_size, len(entries)))
     logger.info("Sampled %d RAs (seed=%d)", len(sample), seed)
 
-    (out_dir / "_sample_manifest.json").write_text(
-        json.dumps(sample, indent=2), encoding="utf-8"
-    )
+    atomic_write_json(sample, out_dir / "_sample_manifest.json")
 
     pages_dir = out_dir / "pages"
     pages_dir.mkdir(parents=True, exist_ok=True)
@@ -116,7 +116,7 @@ def scrape_lawphil_sample(
             continue
         try:
             html = fetch_html(entry["url"])
-            dest.write_text(html, encoding="utf-8")
+            atomic_write_text(html, dest)
             saved += 1
             logger.info("[%d/%d] saved %s", i, len(sample), slug)
             time.sleep(polite_delay)

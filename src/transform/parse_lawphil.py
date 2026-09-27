@@ -9,6 +9,8 @@ from bs4 import BeautifulSoup
 from src.utils.config import settings
 from src.utils.logger import get_logger
 
+from src.utils.io import atomic_write_parquet
+
 logger = get_logger(__name__)
 
 # RA number in <title>: "Republic Act No. 116" / "Republic Act No. 10960-A"
@@ -180,12 +182,8 @@ def parse_lawphil() -> pd.DataFrame:
 
 
 def write_staging(df: pd.DataFrame) -> Path:
-    out_dir = settings.staging_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / "ra_lawphil_staged.parquet"
-    df.to_parquet(out, index=False)
-    logger.info("Wrote %s (%d rows)", out, len(df))
-    return out
+    out = settings.staging_dir / "ra_lawphil_staged.parquet"
+    return atomic_write_parquet(df, out)
 
 
 if __name__ == "__main__":
