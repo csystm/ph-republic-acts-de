@@ -1,0 +1,95 @@
+{
+  "contract_version": "1.0",
+  "generated_at": "2026-09-29T02:04:31.089733+00:00",
+  "total_checks": 10,
+  "passed": 9,
+  "warned": 1,
+  "failed": 0,
+  "overall_status": "warn",
+  "checks": [
+    {
+      "name": "schema_conformance",
+      "severity": "error",
+      "status": "pass",
+      "message": "All expected columns present with expected dtypes",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "ra_id_unique",
+      "severity": "error",
+      "status": "pass",
+      "message": "ra_id is unique",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "required_non_null",
+      "severity": "error",
+      "status": "pass",
+      "message": "All required fields non-null",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "year_range",
+      "severity": "error",
+      "status": "pass",
+      "message": "All ra_year values in [1946, 2027]",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "content_non_stub",
+      "severity": "error",
+      "status": "pass",
+      "message": "All rows have non-empty content",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "content_normalized_non_empty",
+      "severity": "error",
+      "status": "pass",
+      "message": "All content_normalized values non-empty",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "ra_number_shape",
+      "severity": "error",
+      "status": "pass",
+      "message": "All ra_number values match '^\\\\d+[a-z]?$'",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "approval_date_valid",
+      "severity": "error",
+      "status": "pass",
+      "message": "All 7752 non-null approval_date values are valid ISO dates",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "source_distribution",
+      "severity": "warn",
+      "status": "pass",
+      "message": "source distribution: {'bettergov_parquet': 11969}",
+      "violations": 0,
+      "samples": []
+    },
+    {
+      "name": "oversized_content",
+      "severity": "warn",
+      "status": "warn",
+      "message": "3 row(s) exceed 500,000 chars \u2014 expected for codified mega-statutes; informational only",
+      "violations": 3,
+      "samples": [
+        "RA-5050 (2,682,141 chars)",
+        "RA-386 (785,382 chars)",
+        "RA-8424 (524,922 chars)"
+      ]
+    }
+  ]
+}

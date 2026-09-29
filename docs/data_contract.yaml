@@ -1,0 +1,237 @@
+# Data Contract — ra_master
+# DSS150P: Philippine Republic Acts similarity & consolidation
+#
+# This YAML is the single source of truth for the shape, constraints, and
+# validation rules of the curated ra_master dataset. It is machine-readable:
+# src/validation/checks.py loads EXPECTED_COLUMNS and validation rules from it.
+#
+# Field-level reference (human-readable) lives in docs/data_dictionary.md.
+
+contract_version: "1.0"
+effective: "2026-09-27"
+status: active
+owner:
+  project: "DSS150P — Philippine Republic Acts"
+  team: "Data Engineering Project Group Beta"
+dataset: ra_master
+
+purpose: |
+  Curated, analysis-ready corpus of Philippine Republic Acts. Final data
+  product of the pipeline and the sole input to the similarity and clustering
+  analytics. One row per Republic Act, identified by a synthetic key.
+
+producers:
+  module: src/transform/merge_sources.py
+  dag: dags/ra_pipeline.py
+  inputs:
+    - path: data/staging/ra_bettergov_staged.parquet
+      role: bulk
+      approx_rows: 12000
+    - path: data/staging/ra_lawphil_staged.parquet
+      role: cross-source validation
+      approx_rows: 200
+  write_semantics:
+    mode: full_replace
+    atomic: true
+    mechanism: "temp file + os.replace via src.utils.io.atomic_write_parquet"
+    readers_never_see_partial: true
+
+consumers:
+  - name: src/load/load_postgres.py
+    uses: "*"
+    notes: "Upserts into Postgres table ra_master on ra_id"
+  - name: src/load/write_partitions.py
+    uses: "*"
+    notes: "Writes partitioned Parquet by ra_year"
+  - name: src/analytics/tfidf_cluster.py
+    uses: [ra_id, content_normalized, ra_year]
+    notes: "TF-IDF + K-Means; relies on normalized content"
+  - name: human analysts
+    uses: "*"
+    notes: "CSV/JSON exports under outputs/"
+
+schema:
+  primary_key: ra_id
+  unique_constraints:
+    - name: ra_number_year_unique
+      fields: [ra_number, ra_year]
+      rationale: >
+        ra_id is synthetic. This constraint catches hypothetical collisions
+        where the same RA number appears under two different years in the
+        source snapshot.
+  fields:
+    - name: ra_id
+      type: string
+      nullable: false
+      description: "Synthetic primary key: 'RA-' + ra_number, uppercased"
+      example: "RA-10960"
+    - name: ra_number
+      type: string
+      nullable: false
+      pattern: '^\d+[a-z]?$'
+      description: "RA number as it appears in source; optional trailing letter"
+      example: "10960a"
+    - name: ra_year
+      type: integer
+      nullable: false
+      description: "Year of enactment, derived from basename or approval date"
+      example: 2015
+    - name: title
+      type: string
+      nullable: false
+      description: "Official short title; falls back to 'Republic Act No. N'"
+      example: "AN ACT GRANTING..."
+    - name: approval_date
+      type: string
+      format: date
+      nullable: true
+      null_rate_observed: 0.3523
+      description: >
+        ISO 8601 date of approval. Null when source has neither an
+        'Approved:' line nor an inline header date.
+      example: "2015-07-16"
+    - name: content_clean
+      type: string
+      nullable: false
+      description: "Markdown-stripped body text; human-readable"
+      example: "Section 1. Any person..."
+    - name: content_normalized
+      type: string
+      nullable: false
+      description: "Lowercased, boilerplate-stripped, whitespace-collapsed"
+      example: "any person who..."
+    - name: content_length
+      type: integer
+      nullable: false
+      description: "Character count of content_clean"
+      example: 445
+    - name: word_count
+      type: integer
+      nullable: false
+      description: "Whitespace-delimited word count of content_clean"
+      example: 73
+    - name: source
+      type: string
+      nullable: false
+      allowed_values: [bettergov_parquet, lawphil_html]
+      description: "Provenance tag"
+      example: "bettergov_parquet"
+    - name: source_path
+      type: string
+      nullable: false
+      description: "Path to source artifact, relative to provider root"
+      example: "datasets/markdown/repacts/1946/ra_10_1946.md"
+
+validation_rules:
+  - id: 1
+    name: schema_conformance
+    check: check_schema
+    severity: error
+    description: >
+      All expected columns present, no unexpected columns, dtypes match
+      schema.fields above.
+  - id: 2
+    name: ra_id_unique
+    check: check_ra_id_unique
+    severity: error
+    description: "ra_id values are unique across the dataset."
+  - id: 3
+    name: required_non_null
+    check: check_required_non_null
+    severity: error
+    description: "All fields with nullable: false are non-null."
+  - id: 4
+    name: year_range
+    check: check_year_range
+    severity: error
+    params:
+      min: 1946
+      max_offset_years: 1     # current_year + 1
+    description: "ra_year within [1946, current_year + 1]."
+  - id: 5
+    name: content_non_stub
+    check: check_content_non_stub
+    severity: error
+    params:
+      min_word_count: 5
+      min_content_length: 1
+    description: "No stub rows (empty content or near-empty)."
+  - id: 6
+    name: content_normalized_non_empty
+    check: check_normalized_non_empty
+    severity: error
+    description: "content_normalized is non-empty for every row."
+  - id: 7
+    name: ra_number_shape
+    check: check_ra_number_shape
+    severity: error
+    params:
+      pattern: '^\d+[a-z]?$'
+    description: "ra_number matches the expected shape."
+  - id: 8
+    name: approval_date_valid
+    check: check_approval_date
+    severity: error
+    description: "approval_date is a valid ISO date when non-null."
+  - id: 9
+    name: source_distribution
+    check: check_source_distribution
+    severity: warn
+    description: "Reports source distribution; informational."
+  - id: 10
+    name: oversized_content
+    check: check_oversized_content
+    severity: warn
+    params:
+      absolute_chars: 500000
+    description: >
+      Reports rows above the oversized threshold. Codified mega-statutes are
+      expected; this is a review prompt, not a failure.
+
+failure_surfaces:
+  - stdout logs at ERROR level
+  - exit code 1 (blocks Airflow task)
+  - outputs/validation_report.json (per-check pass/fail + samples)
+
+refresh:
+  trigger: "Airflow DAG ra_pipeline (schedule=None for demo; @weekly in production)"
+  mode: full_recompute
+  rerun_safety: atomic_writes_and_postgres_upsert
+  expected_runtime_seconds:
+    merge: 15
+    full_pipeline_excluding_ingestion: 120
+  source_dependencies:
+    - "HuggingFace: bettergovph/gov-library"
+    - "lawphil.net HTML index and pages"
+
+limitations:
+  - id: coverage_skew
+    description: >
+      BetterGov supplies ~12K RAs; Lawphil is a 200-RA validation sample.
+      Any claim about "the corpus" refers to BetterGov.
+    ref: docs/source_profiling.md
+  - id: approval_date_nullability
+    description: >
+      ~35% of rows have null approval_date. Downstream analytics must fall
+      back to ra_year when null.
+  - id: duplicate_ra_id_resolution
+    description: >
+      Three ra_id values (RA-6426, RA-7663, RA-7688) appear under two source
+      years each. Merge keeps the first-seen row. Documented, not a bug.
+    ref: src/transform/merge_sources.py::dedupe_within_source
+  - id: mega_statutes_kept
+    description: >
+      RA-386, RA-5050, RA-8424 exceed 500K chars. Legitimate codified
+      statutes. Analytics may weight or cap; curated layer does not.
+  - id: lawphil_overlap_dropped
+    description: >
+      199/199 Lawphil rows overlap with BetterGov and are dropped on merge.
+      Lawphil-only rows are retained if the source ever produces them.
+  - id: synthetic_ra_id
+    description: >
+      ra_id is not a source-native identifier. See schema.unique_constraints.
+
+change_log:
+  - version: "1.0"
+    date: "2026-09-27"
+    change: "Initial contract. 11 fields, 10 validation rules."
