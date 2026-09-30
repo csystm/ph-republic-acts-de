@@ -22,6 +22,11 @@ data/curated/*
 !data/staging/.gitkeep
 !data/curated/.gitkeep
 
+# Curated data
+!data/curated/ra_master.parquet
+!data/curated/ra_master_partitioned/
+!data/curated/ra_master_partitioned/**
+
 # OS
 .DS_Store
 Thumbs.db
@@ -42,3 +47,10 @@ Thumbs.db
 
 # Scratch
 data/_scratch/
+
+# Large regenerable exports — ignore
+outputs/ra_master.csv
+outputs/ra_master.jsonl
+
+# Keep the small graded metric
+!outputs/format_comparison.json
