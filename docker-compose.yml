@@ -10,6 +10,11 @@ x-airflow-common: &airflow-common
     - AIRFLOW__CORE__LOAD_EXAMPLES=False
     - AIRFLOW__LOGGING__LOGGING_LEVEL=INFO
     - DATA_DIR=/opt/airflow/data
+    - POSTGRES_HOST=postgres         # container-network name, NOT localhost
+    - POSTGRES_PORT=5432
+    - POSTGRES_USER=${POSTGRES_USER}
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    - POSTGRES_DB=${POSTGRES_DB}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./src:/opt/airflow/src
@@ -17,6 +22,7 @@ x-airflow-common: &airflow-common
     - ./config:/opt/airflow/config
     - ./sql:/opt/airflow/sql
     - ./outputs:/opt/airflow/outputs
+    - ./docs:/opt/airflow/docs
   depends_on:
     postgres:
       condition: service_healthy

@@ -25,7 +25,7 @@ class Settings:
 
         self.lawphil_index_url = os.getenv(
             "LAWPHIL_BASE_URL",
-            "https://lawphil.net/statutes/repacts/repacts.html",
+            "https://lawphil.net/statutes/repacts/",
         )
         self.lawphil_sample_size = int(os.getenv("LAWPHIL_SAMPLE_SIZE", "200"))
 
