@@ -10,3 +10,5 @@ numpy==1.26.4
 python-dotenv==1.0.1
 huggingface_hub==0.24.6
 PyYAML==6.0.2
+certifi>=2026.7.22
+truststore>=0.10.4

@@ -34,6 +34,12 @@ class Settings:
             "https://huggingface.co/datasets/bettergovph/gov-library/resolve/main/repacts.parquet",
         )
 
+        self.elibrary_base_url = os.getenv(
+            "ELIBRARY_BASE_URL",
+            "https://elibrary.judiciary.gov.ph",
+        )
+        self.elibrary_page_size = int(os.getenv("ELIBRARY_PAGE_SIZE", "500"))
+
     @property
     def raw_dir(self) -> Path:
         return self.data_dir / "raw"
