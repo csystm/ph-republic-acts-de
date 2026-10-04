@@ -1,9 +1,12 @@
 """Merge BetterGov and Lawphil staged Parquets into the curated ra_master.
 
 Policy (see docs/source_profiling.md §5):
-  - Union of both staged sources on ``ra_id``.
+  - Union of BetterGov and Lawphil on ``ra_id``.
   - On overlap, keep the BetterGov row; log Lawphil rows dropped.
   - Drop stub rows (``word_count < MIN_WORD_COUNT``).
+  - Policy B: gap-fill null ``approval_date`` values from the E-Library
+    staged index. Match on ``ra_number``; nulls only; no new rows; no
+    ``source`` retagging. E-Library rows never enter the curated set.
   - Add ``content_normalized`` for downstream analytics.
   - Write a single ``data/curated/ra_master.parquet`` atomically.
 
@@ -158,16 +161,31 @@ def _log_stubs(df: pd.DataFrame) -> None:
 
 # Steps
 
-def load_staging() -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_staging() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     bg_path = settings.staging_dir / "ra_bettergov_staged.parquet"
     lp_path = settings.staging_dir / "ra_lawphil_staged.parquet"
+    el_path = settings.staging_dir / "ra_elibrary_staged.parquet"
+
     logger.info("Reading %s", bg_path)
     bg = pd.read_parquet(bg_path)
     logger.info("  -> %d rows", len(bg))
+
     logger.info("Reading %s", lp_path)
     lp = pd.read_parquet(lp_path)
     logger.info("  -> %d rows", len(lp))
-    return bg, lp
+
+    if el_path.exists():
+        logger.info("Reading %s", el_path)
+        el = pd.read_parquet(el_path)
+        logger.info("  -> %d rows", len(el))
+    else:
+        logger.warning(
+            "E-Library staging not found at %s; Policy B gap-fill disabled",
+            el_path,
+        )
+        el = pd.DataFrame(columns=["ra_number", "approval_date"])
+
+    return bg, lp, el
 
 
 def diagnose(bg: pd.DataFrame) -> None:
@@ -212,6 +230,65 @@ def merge_sources(bg: pd.DataFrame, lp: pd.DataFrame) -> pd.DataFrame:
     )
     return merged
 
+def gap_fill_approval_date(
+    df: pd.DataFrame, el: pd.DataFrame
+) -> pd.DataFrame:
+    """Policy B — fill null ``approval_date`` values from the E-Library index.
+
+    Contract:
+      * match on ``ra_number`` (string, may carry a trailing letter)
+      * fill nulls only — never overwrite a non-null date
+      * do not add rows
+      * do not touch any other column
+      * do not retag ``source`` — E-Library is a lookup, not a provenance source
+
+    Returns a copy with the same shape as ``df``.
+    """
+    before_nulls = int(df["approval_date"].isna().sum())
+    if before_nulls == 0:
+        logger.info("Policy B: no null approval_date values; skipping gap-fill")
+        return df
+
+    if el is None or el.empty:
+        logger.warning(
+            "Policy B: %d null approval_date(s) present but E-Library "
+            "staging is empty; nothing to fill",
+            before_nulls,
+        )
+        return df
+
+    # Build lookup from E-Library rows that actually carry a date.
+    el_dates = (
+        el.loc[el["approval_date"].notna(), ["ra_number", "approval_date"]]
+        .drop_duplicates(subset="ra_number", keep="first")
+    )
+    lookup = dict(zip(el_dates["ra_number"], el_dates["approval_date"]))
+    logger.info(
+        "Policy B: E-Library lookup has %d distinct ra_number -> date",
+        len(lookup),
+    )
+
+    df = df.copy()
+    null_mask = df["approval_date"].isna()
+    fill_values = df.loc[null_mask, "ra_number"].map(lookup)
+    recovered = int(fill_values.notna().sum())
+
+    df.loc[null_mask, "approval_date"] = fill_values
+
+    after_nulls = int(df["approval_date"].isna().sum())
+    n = len(df)
+    reduction_pct = (100.0 * recovered / before_nulls) if before_nulls else 0.0
+    logger.info(
+        "Policy B: Recovered %d approval_date values from elibrary "
+        "(nulls %d -> %d, %.1f%% of gaps filled; overall %.2f%% -> %.2f%%)",
+        recovered,
+        before_nulls,
+        after_nulls,
+        reduction_pct,
+        (100.0 * before_nulls / n) if n else 0.0,
+        (100.0 * after_nulls / n) if n else 0.0,
+    )
+    return df
 
 def add_normalized(df: pd.DataFrame) -> pd.DataFrame:
     logger.info("Computing content_normalized for %d rows", len(df))
@@ -241,13 +318,14 @@ def write_curated(df: pd.DataFrame) -> None:
 # Entry point
 
 def main() -> None:
-    bg, lp = load_staging()
+    bg, lp, el = load_staging()
     diagnose(bg)
 
     bg = drop_stubs(bg)
     bg = dedupe_within_source(bg)
 
     merged = merge_sources(bg, lp)
+    merged = gap_fill_approval_date(merged, el)
     merged = add_normalized(merged)
     curated = project_columns(merged)
 
