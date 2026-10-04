@@ -18,9 +18,11 @@ logs/
 data/raw/*
 data/staging/*
 data/curated/*
+data/profiling/*
 !data/raw/.gitkeep
 !data/staging/.gitkeep
 !data/curated/.gitkeep
+!data/profiling/.gitkeep
 
 # Curated data
 !data/curated/ra_master.parquet
