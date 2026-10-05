@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS ra_master (
     CONSTRAINT ra_year_range         CHECK (ra_year BETWEEN 1946 AND 2100),
     CONSTRAINT ra_id_shape           CHECK (ra_id ~ '^RA-[0-9]+[A-Z]?$'),
     CONSTRAINT ra_number_shape       CHECK (ra_number ~ '^[0-9]+[a-z]?$'),
-    CONSTRAINT source_allowed        CHECK (source IN ('bettergov_parquet', 'lawphil_html')),
+    CONSTRAINT source_allowed        CHECK (source IN ('bettergov_parquet', 'lawphil_html', 'elibrary_json')),
     CONSTRAINT word_count_nonneg     CHECK (word_count >= 0),
     CONSTRAINT content_length_nonneg CHECK (content_length >= 0),
     CONSTRAINT source_path_nonempty  CHECK (length(source_path) > 0)
