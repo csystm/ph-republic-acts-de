@@ -17,28 +17,25 @@ lands in ``data/raw/elibrary/_manifest.json``.
 
 Idempotency: a page file that already exists is reused, not re-fetched. If a
 prior run left ``_manifest.json`` with ``complete: true`` and the caller did
-not pass ``--sample``, the scrape is a no-op.
+not pass ``--sample`` or ``--force``, the scrape is a no-op.
 
-TLS: this module uses ``truststore.SSLContext`` (the operating system's
-certificate store) explicitly, mounted onto the requests Session. This is
-the recommended alternative to the global ``truststore.inject_into_ssl()``
-because it does not monkey-patch Python's global ``ssl`` module and
-therefore cannot affect other libraries in the same process.
-See https://github.com/sethmlarson/truststore.
+TLS: the E-Library server sends an incomplete certificate chain — its leaf's
+issuer is omitted. Windows CryptoAPI silently AIA-fetches the missing
+intermediate; OpenSSL does not, which would break the Docker container. We
+ship the intermediate under ``certs/`` and concatenate it with certifi's
+roots into a runtime bundle used as ``verify=``. See ``_make_session``.
 """
 
 import argparse
 import json
 import re
-import ssl
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import certifi
 import requests
-import truststore
-from requests.adapters import HTTPAdapter
 
 from src.utils.config import settings
 from src.utils.io import atomic_write_json, atomic_write_text
@@ -87,37 +84,41 @@ HEADERS_POST = {
 }
 
 
-# ---------------------------------------------------------------------------
-# HTTP session bound to the OS trust store (no global monkey-patching)
-# ---------------------------------------------------------------------------
-
-class _TruststoreAdapter(HTTPAdapter):
-    """HTTPAdapter that uses a truststore.SSLContext for TLS verification.
-
-    Injects the OS-trust-store-backed SSL context into urllib3's pool
-    manager (and proxy manager) so only this Session is affected. The rest
-    of the process keeps whatever SSL behaviour it had.
-    """
-
-    def __init__(self, *args: Any, ssl_context: ssl.SSLContext, **kwargs: Any) -> None:
-        self._ssl_context = ssl_context
-        super().__init__(*args, **kwargs)
-
-    def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
-        kwargs["ssl_context"] = self._ssl_context
-        return super().init_poolmanager(*args, **kwargs)
-
-    def proxy_manager_for(self, *args: Any, **kwargs: Any) -> Any:
-        kwargs["ssl_context"] = self._ssl_context
-        return super().proxy_manager_for(*args, **kwargs)
+_CERT_DIR = Path(__file__).resolve().parents[2] / "certs"
+_ELIBRARY_INTERMEDIATE = _CERT_DIR / "gsgccr3evtlsca2025.pem"
 
 
 def _make_session() -> requests.Session:
-    """Return a requests Session whose HTTPS connections use the OS trust store."""
-    ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    """Return a requests Session bound to a deterministic CA bundle.
+
+    The E-Library server sends an incomplete chain — its leaf's real issuer
+    (``GlobalSign GCC R3 EV TLS CA 2025``) is omitted, and unrelated
+    GlobalSign certificates are sent instead. Windows CryptoAPI silently
+    AIA-fetches the missing intermediate; OpenSSL does not, so the
+    container would fail with ``unable to get local issuer certificate``.
+
+    We ship the intermediate under ``certs/`` (sourced from the leaf's own
+    AIA extension at ``secure.globalsign.com``, chain-verified before
+    commit) and concatenate it with certifi's roots into a runtime bundle
+    that is passed as ``verify=`` on the session. Same verification result
+    on Windows and Linux, no OS-level AIA dependency.
+    """
+    if not _ELIBRARY_INTERMEDIATE.exists():
+        raise RuntimeError(
+            f"Missing intermediate certificate: {_ELIBRARY_INTERMEDIATE}. "
+            "See docs/architecture.md for the source AIA URL."
+        )
+
+    bundle_path = settings.data_dir / "ca_bundle_elibrary.pem"
+    bundle_path.parent.mkdir(parents=True, exist_ok=True)
+    bundle_path.write_bytes(
+        Path(certifi.where()).read_bytes()
+        + b"\n"
+        + _ELIBRARY_INTERMEDIATE.read_bytes()
+    )
+
     session = requests.Session()
-    session.mount("https://", _TruststoreAdapter(ssl_context=ctx))
-    session.mount("http://", HTTPAdapter())
+    session.verify = str(bundle_path)
     return session
 
 
@@ -228,11 +229,17 @@ def _save_page(pages_dir: Path, page_idx: int, resp: dict[str, Any]) -> Path:
 def scrape_elibrary(
     sample_pages: int | None = None,
     polite_delay: float = 1.0,
+    force: bool = False,
 ) -> dict[str, Any]:
     """Fetch E-Library RA index pages, saving raw JSON per page.
 
+    ``force=True`` re-fetches every page even when a complete manifest exists.
+    Per-page skip-if-exists is disabled in that case, so this re-downloads the
+    full index. Used by the DAG's ``force_ingest=true`` path.
+
     Returns the manifest dict (also written to disk).
     """
+
     base = settings.elibrary_base_url.rstrip("/")
     page_size = settings.elibrary_page_size
 
@@ -242,8 +249,8 @@ def scrape_elibrary(
 
     manifest_path = out_dir / "_manifest.json"
 
-    # Whole-run skip: complete manifest + no --sample override.
-    if sample_pages is None and manifest_path.exists():
+    # Whole-run skip: complete manifest + no --sample override + not forced.
+    if not force and sample_pages is None and manifest_path.exists():
         try:
             prior = json.loads(manifest_path.read_text())
             if prior.get("complete") is True:
@@ -307,7 +314,7 @@ def scrape_elibrary(
     for page_idx in range(2, pages_to_fetch + 1):
         start = (page_idx - 1) * page_size
         dest = pages_dir / f"page_{page_idx:04d}.json"
-        if dest.exists():
+        if dest.exists() and not force:
             logger.info(
                 "[%d/%d] page file exists, skipping fetch",
                 page_idx,
@@ -389,8 +396,20 @@ def main() -> None:
         default=1.0,
         help="Seconds to sleep between POST requests. Default: 1.0",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Re-fetch all pages even if a complete manifest exists. "
+            "Used by the DAG's force_ingest=true path."
+        ),
+    )
     args = parser.parse_args()
-    scrape_elibrary(sample_pages=args.sample, polite_delay=args.polite_delay)
+    scrape_elibrary(
+        sample_pages=args.sample,
+        polite_delay=args.polite_delay,
+        force=args.force,
+    )
 
 
 if __name__ == "__main__":

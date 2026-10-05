@@ -38,3 +38,7 @@ data/curated/** -text
 data/**        linguist-vendored
 docs/**        linguist-documentation
 notebooks/**   linguist-documentation
+
+# Never rewrite line endings for certificate files — PEM parsers are picky.
+*.crt  -text
+*.pem  -text

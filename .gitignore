@@ -56,3 +56,8 @@ outputs/ra_master.jsonl
 
 # Keep the small graded metric
 !outputs/format_comparison.json
+
+# Public intermediate CA certificate for elibrary.judiciary.gov.ph.
+# Not a secret — sourced from GlobalSign's public AIA endpoint and verified
+# before commit (see certs/README.md). Allow it despite the *.pem rule.
+!certs/gsgccr3evtlsca2025.pem

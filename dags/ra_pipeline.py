@@ -2,7 +2,8 @@
 
 Stages
 ------
-1. ingest     — programmatic retrieval (BetterGov parquet + Lawphil HTML)
+1. ingest     — programmatic retrieval (BetterGov parquet, Lawphil HTML,
+                Supreme Court E-Library JSON)
 2. transform  — Raw -> Staging -> Curated merge
 3. validate   — contract-driven data-quality checks
 4. load       — Postgres upsert + partitioned Parquet + CSV/JSON exports
@@ -38,12 +39,18 @@ def _run(module: str) -> str:
     return f"cd {REPO_ROOT_IN_CONTAINER} && {PYTHON} -m {module}"
 
 
-def _ingest_cmd(module: str) -> str:
-    """Conditionally-run bash command based on {{ params.force_ingest }}."""
+def _ingest_cmd(module: str, force_arg: str = "") -> str:
+    """Conditionally-run bash command based on {{ params.force_ingest }}.
+
+    ``force_arg`` (e.g. ``"--force"``) is appended to the module invocation
+    only when force_ingest=true. Use it for modules whose own idempotency
+    check would otherwise short-circuit the re-fetch.
+    """
+    suffix = f" {force_arg}" if force_arg else ""
     return (
         f"cd {REPO_ROOT_IN_CONTAINER}\n"
         'if [ "{{ params.force_ingest | lower }}" = "true" ]; then\n'
-        f"  {PYTHON} -m {module}\n"
+        f"  {PYTHON} -m {module}{suffix}\n"
         "else\n"
         '  echo "[skip] force_ingest=False; reusing cached raw data"\n'
         "fi\n"
@@ -66,8 +73,9 @@ external sources.
 
 **Stages**
 
-1. `ingest` — programmatic retrieval (BetterGov parquet + Lawphil HTML).
-   Gated by `params.force_ingest` (default `False` = use cached raw data).
+1. `ingest` — programmatic retrieval (BetterGov parquet, Lawphil HTML,
+   Supreme Court E-Library JSON). Gated by `params.force_ingest`
+   (default `False` = use cached raw data).
 2. `transform` — raw -> staging -> curated merge.
 3. `validate` — contract-driven data-quality checks
    (errors gate the pipeline; warnings report only).
@@ -102,8 +110,9 @@ with DAG(
             default=False,
             type="boolean",
             description=(
-                "If True, re-download the BetterGov parquet and re-scrape "
-                "Lawphil HTML. If False (default), reuse cached raw data."
+                "If True, re-download the BetterGov parquet, re-scrape "
+                "Lawphil HTML, and re-fetch the Supreme Court E-Library "
+                "JSON index. If False (default), reuse cached raw data."
             ),
         ),
     },
@@ -127,6 +136,13 @@ with DAG(
             retry_delay=timedelta(minutes=1),
             execution_timeout=timedelta(minutes=30),
         )
+        scrape_el = BashOperator(
+            task_id="scrape_elibrary",
+            bash_command=_ingest_cmd("src.extract.scrape_elibrary", "--force"),
+            retries=3,
+            retry_delay=timedelta(minutes=1),
+            execution_timeout=timedelta(minutes=15),
+        )
 
     # -------- transform --------
     with TaskGroup("transform", tooltip="Raw -> Staging -> Curated") as transform_group:
@@ -140,12 +156,17 @@ with DAG(
             bash_command=_run("src.transform.parse_lawphil"),
             execution_timeout=timedelta(minutes=10),
         )
+        parse_el = BashOperator(
+            task_id="parse_elibrary",
+            bash_command=_run("src.transform.parse_elibrary"),
+            execution_timeout=timedelta(minutes=10),
+        )
         merge = BashOperator(
             task_id="merge_sources",
             bash_command=_run("src.transform.merge_sources"),
             execution_timeout=timedelta(minutes=15),
         )
-        [parse_bg, parse_lp] >> merge
+        [parse_bg, parse_lp, parse_el] >> merge
 
     # -------- validate --------
     validate = BashOperator(

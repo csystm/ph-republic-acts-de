@@ -1,6 +1,6 @@
 {
-  "contract_version": "1.0",
-  "generated_at": "2026-09-30T03:55:30.074989+00:00",
+  "contract_version": "1.1",
+  "generated_at": "2026-10-05T15:03:33.226057+00:00",
   "total_checks": 10,
   "passed": 9,
   "warned": 1,
@@ -67,7 +67,7 @@
       "name": "approval_date_valid",
       "severity": "error",
       "status": "pass",
-      "message": "All 7752 non-null approval_date values are valid ISO dates",
+      "message": "All 11911 non-null approval_date values are valid ISO dates",
       "violations": 0,
       "samples": []
     },
