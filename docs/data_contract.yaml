@@ -7,8 +7,8 @@
 #
 # Field-level reference (human-readable) lives in docs/data_dictionary.md.
 
-contract_version: "1.1"
-effective: "2026-10-05"
+contract_version: "1.2"
+effective: "2026-10-06"
 status: active
 owner:
   project: "DSS150P — Philippine Republic Acts"
@@ -88,10 +88,14 @@ schema:
       type: string
       format: date
       nullable: true
-      null_rate_observed: 0.3523
+      null_rate_observed: 0.0048
       description: >
-        ISO 8601 date of approval. Null when source has neither an
-        'Approved:' line nor an inline header date.
+        ISO 8601 date of approval. Populated from the source's 'Approved:'
+        line or inline header date where present. Nulls in the BetterGov
+        base are gap-filled from the Supreme Court E-Library staged layer
+        (see docs/data_flow.md §2.1 and §4). After gap-fill,
+        58 of 11,969 curated rows (0.48%) remain null — these are RAs whose
+        approval dates are absent from both BetterGov and E-Library.
       example: "2015-07-16"
     - name: content_clean
       type: string
@@ -197,7 +201,7 @@ failure_surfaces:
   - outputs/validation_report.json (per-check pass/fail + samples)
 
 refresh:
-  trigger: "Airflow DAG ra_pipeline (schedule=None for demo; @weekly in production)"
+  trigger: "Airflow DAG ra_pipeline (schedule='0 2 1 * *' — monthly, 1st at 02:00; DAG is paused by default for demo control)"
   mode: full_recompute
   rerun_safety: atomic_writes_and_postgres_upsert
   expected_runtime_seconds:
@@ -216,8 +220,11 @@ limitations:
     ref: docs/source_profiling.md
   - id: approval_date_nullability
     description: >
-      ~35% of rows have null approval_date. Downstream analytics must fall
-      back to ra_year when null.
+      After gap-fill from the Supreme Court E-Library, 58 of
+      11,969 curated rows (0.48%) have null approval_date. The residual
+      nulls are RAs whose approval dates are absent from both BetterGov
+      and E-Library. Downstream analytics may fall back to ra_year for
+      these.
   - id: duplicate_ra_id_resolution
     description: >
       Three ra_id values (RA-6426, RA-7663, RA-7688) appear under two source
@@ -255,3 +262,12 @@ change_log:
       Add elibrary_json as a source value. Register the E-Library staged
       Parquet as an approval_date lookup input to merge_sources. Note the
       metadata-only limitation. No schema fields added or removed.
+  - version: "1.2"
+    date: "2026-10-06"
+    change: >
+      Descriptive refresh after third-source integration. Update
+      approval_date.null_rate_observed from 0.3523 (pre-gap-fill BetterGov
+      staged) to 0.0048 (post-Policy-B curated); correct refresh.trigger
+      to the actual monthly schedule; refresh the approval_date_nullability
+      limitation text. No schema fields added or removed; no validation
+      rules changed; no constraint modified. Fully backward-compatible.

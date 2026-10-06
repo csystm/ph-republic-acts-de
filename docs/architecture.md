@@ -386,7 +386,7 @@ the curated layer.**
 
 ## 4. Data Contract
 
-`docs/data_contract.yaml` (`contract_version: 1.1`) is the single source
+`docs/data_contract.yaml` (`contract_version: 1.2`) is the single source
 of truth for schema, nullability, unique constraints, and validation
 thresholds. `checks.py` derives its constants from the contract via
 `contract.py`. Editing the YAML changes pipeline behavior — no schema

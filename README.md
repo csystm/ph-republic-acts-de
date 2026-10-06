@@ -80,7 +80,7 @@ and rerun-safe**. This project delivers that system.
 - **Partitioned Parquet** by `ra_year` (66 partitions, `year=YYYY/`)
 - **CSV and NDJSON exports** for downstream consumers
 - **Full-text searchable** on `content_normalized`
-- **Contract-validated** (`docs/data_contract.yaml`, v1.1, 10 checks)
+- **Contract-validated** (`docs/data_contract.yaml`, v1.2, 10 checks)
 - **`approval_date` gap-filled from the Supreme Court E-Library** via
   Policy B — null rate reduced from 35.23% → 0.48% (4,159 dates
   recovered)
@@ -463,7 +463,7 @@ is intentionally paused for demo control; unpause to enable the schedule.
 
 ## 15. Data Quality & Validation
 
-The contract lives at **`docs/data_contract.yaml`** (`contract_version: 1.1`).
+The contract lives at **`docs/data_contract.yaml`** (`contract_version: 1.2`).
 It is the single source of truth for schema, types, nullability,
 constraints, and validation rules. `src/validation/checks.py` derives all
 its constants from it — editing the YAML changes pipeline behavior with

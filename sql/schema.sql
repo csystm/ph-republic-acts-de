@@ -1,6 +1,6 @@
 -- sql/schema.sql
 -- DDL for the curated ra_master table.
--- Source of truth: docs/data_contract.yaml (contract_version 1.0)
+-- Source of truth: docs/data_contract.yaml (contract_version 1.2)
 -- 11 fields, transcribed 1:1.
 
 CREATE TABLE IF NOT EXISTS ra_master (
