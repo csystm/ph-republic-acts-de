@@ -61,3 +61,6 @@ outputs/ra_master.jsonl
 # Not a secret — sourced from GlobalSign's public AIA endpoint and verified
 # before commit (see certs/README.md). Allow it despite the *.pem rule.
 !certs/gsgccr3evtlsca2025.pem
+
+# Analytics plots — regenerable; the served copies live under docs/assets/plots/
+outputs/analytics/plots/
