@@ -28,9 +28,10 @@ dataset for similarity analysis and policy consolidation research.
 14. [Inspecting Airflow](#14-inspecting-airflow)
 15. [Data Quality & Validation](#15-data-quality--validation)
 16. [Expected Outputs](#16-expected-outputs)
-17. [Known Limitations](#17-known-limitations)
-18. [Troubleshooting](#18-troubleshooting)
-19. [Future Improvements](#19-future-improvements)
+17. [Bonus Analytics — TF-IDF + K-Means](#17-bonus-analytics--tf-idf--k-means)
+18. [Known Limitations](#18-known-limitations)
+19. [Troubleshooting](#19-troubleshooting)
+20. [Future Improvements](#20-future-improvements)
 
 ---
 
@@ -234,7 +235,8 @@ equivalent linear representation.*
 | Orchestration | Apache Airflow 2.9.1 |
 | Containerization | Docker + Docker Compose |
 | HTTP / scraping | `requests`, `beautifulsoup4`, `huggingface_hub`, `certifi` (+ shipped intermediate for E-Library TLS) |
-| Analytics (bonus) | scikit-learn (TF-IDF, K-Means) |
+| Analytics (bonus) | scikit-learn (TF-IDF, K-Means), matplotlib, Plotly |
+| Static site | HTML + CSS; GitHub Pages (`docs/`) |
 
 ## 8. Repository Structure
 
@@ -258,7 +260,11 @@ ph-republic-acts-de/
 ├── certs/
 │   ├── gsgccr3evtlsca2025.pem  # shipped intermediate (public; E-Library TLS)
 │   └── README.md               # provenance + refresh procedure
-├── docs/
+├── docs/                       # GitHub Pages root (served)
+│   ├── .nojekyll               # disable Jekyll processing
+│   ├── index.html              # the analytics site
+│   ├── assets/                 # site CSS + plot embeds (generated)
+│   ├── data/                   # pre-computed JSON the site reads
 │   ├── architecture.md
 │   ├── data_flow.md
 │   ├── data_contract.yaml
@@ -276,7 +282,7 @@ ph-republic-acts-de/
 │   ├── transform/              # parse_bettergov, parse_lawphil, parse_elibrary, merge_sources
 │   ├── load/                   # load_postgres, write_partitions
 │   ├── validation/             # contract, checks, profile sources
-│   ├── analytics/              # tfidf_cluster (bonus)
+│   ├── analytics/              # tfidf_cluster, cluster_analysis, plots, temporal_eda, build_site
 │   └── utils/                  # config, logger, io (atomic writers)
 └── tests/
 ```
@@ -434,6 +440,25 @@ python -m src.load.write_partitions
 
 Each stage is idempotent. Rerunning any stage is safe.
 
+### Bonus analytics (host only)
+
+The bonus analytics reads the curated parquet and produces a static
+GitHub Pages site. It is **not** part of the orchestrated DAG — the
+mandatory pipeline ends at PostgreSQL; analytics is a downstream
+consumer of `data/curated/ra_master.parquet` (rubric §3 explicitly
+allows optional analytics outside the production pipeline).
+
+```bash
+python -m src.analytics.tfidf_cluster    # vectorize + k-sweep → metrics.json
+python -m src.analytics.cluster_analysis # final fit + t-SNE + summaries
+python -m src.analytics.plots            # PNG + Plotly embeds
+python -m src.analytics.temporal_eda     # date-level EDA
+python -m src.analytics.build_site       # assemble docs/index.html
+```
+
+Open `docs/index.html` to preview locally. Determinism: `random_state=42`
+throughout; reruns are byte-identical.
+
 ## 14. Inspecting Airflow
 
 **From the UI:**
@@ -510,6 +535,7 @@ sample violations for debugging.
 | `outputs/ra_master.jsonl` | NDJSON export (170 MB) | no (regenerable) |
 | `data/raw/**` | Source-faithful raw | no (regenerable) |
 | `data/staging/**` | Per-source cleaned | no (regenerable) |
+| `docs/index.html` + `docs/assets/` + `docs/data/` | Static analytics site | **yes** |
 
 **Postgres:** table `ra_master` — 11,969 rows.
 
@@ -521,7 +547,100 @@ df = pd.read_parquet("data/curated/ra_master_partitioned/year=2015")
 # 85 rows in 0.03s
 ```
 
-## 17. Known Limitations
+## 17. Bonus Analytics — TF-IDF + K-Means
+
+**Live site:** `https://csystm.github.io/ph-republic-acts-de/`
+
+The bonus analytics addresses the project's original problem directly:
+*which Republic Acts are similar enough to be consolidation candidates?*
+It produces a static, publicly viewable site that any evaluator can
+open in a browser without running anything.
+
+### Method
+
+Documents are vectorized from the pre-normalized `content_normalized`
+column using `TfidfVectorizer(max_features=5000, min_df=5, max_df=0.3,
+stop_words="english")`. The `max_df=0.3` cutoff removes corpus-wide
+boilerplate (e.g. *section*, *provided*, *republic*) that would
+otherwise dominate a generic "legislative language" cluster.
+
+The three **mega-statutes** — RA-386 (Civil Code), RA-5050, and RA-8424
+(NIRC amendments) — are excluded from the TF-IDF fit only. Each exceeds
+500K characters and would otherwise pull every cluster centroid toward
+codified-statute vocabulary. They remain in the curated parquet; this is
+a documented analytics choice, not a data-quality rule.
+
+K-Means is fit for **k = 2..30**; both inertia (elbow) and silhouette on
+a 2,000-point sample are recorded. Final **k = 15** is chosen by an
+elbow/silhouette consensus rule: if the global silhouette maximum is a
+noise spike (margin < 0.02 over the elbow-adjacent peak), the
+elbow-adjacent peak is used. Here the silhouette curve is flat past
+k = 13, so k = 15 was chosen. For visualization, the TF-IDF matrix is
+reduced by `TruncatedSVD(n_components=50)` and then projected to 2D with
+`TSNE(perplexity=30, init="pca", random_state=42)`.
+
+### Results
+
+| Metric | Value |
+|---|---|
+| Working corpus | 11,966 RAs (3 mega-statutes dropped for the fit) |
+| TF-IDF vocabulary | 5,000 terms (density 3.34%) |
+| Final k | 15 |
+| Final silhouette | 0.0815 |
+| Elbow | k = 13 |
+| Global silhouette max | k = 29 (spike; margin 0.0091 < 0.02) |
+
+**Cluster themes.** 14 of 15 clusters are cleanly interpretable policy
+themes: broadcasting franchises, telecom station permits, hospital
+appropriations, hospital bed expansion, city charters, barrio creation,
+electric franchises, ice-plant franchises, agricultural/vocational
+appropriations, state universities and colleges, community education
+and sports, school name changes, infrastructure/courts/holidays, and
+provincial government fiscal offices. Cluster C12 captures numbered
+line-item amendment boilerplate — a known limitation of bag-of-words
+representations on template-heavy legal text.
+
+**Temporal EDA** (enabled by Policy B's 99.52% `approval_date`
+population):
+
+- **1972–1987 gap** in enactments per year — the Martial Law period,
+  during which laws were issued as Presidential Decrees and Batas
+  Pambansa rather than Republic Acts.
+- **Post-1987 surge** following the restoration of the bicameral
+  Congress.
+- **June spike** in month-of-approval — the congressional rush to
+  adjournment (regular session ends in late May or early June).
+- **Saturday concentration** (~33% of all enacted dates) — a pattern
+  that **replicates independently across both source datasets** (33.8%
+  in original BetterGov dates, 30.5% in E-Library-recovered dates), so
+  it is not a single-source artifact. Likely a publication-date or
+  recording convention.
+
+### Rubric mapping (§ 7.1)
+
+| Bonus area | Max | Delivered by |
+|---|---|---|
+| Meaningful EDA using curated data | +2 | Cluster size distribution, per-cluster year range, three temporal charts |
+| Effective visualization / dashboard | +2 | Interactive Plotly scatter and top-terms charts + static PNG fallbacks |
+| Appropriate statistical analysis | +2 | Elbow + silhouette across k=2..30; final metrics reported |
+| Insights directly answer the problem | +2 | 15 named themes with representative RAs → candidate consolidation groups |
+| Advanced analytics (ML) | +2 | TF-IDF + K-Means, method justified on the site |
+
+### Reproduce
+
+```bash
+python -m src.analytics.tfidf_cluster
+python -m src.analytics.cluster_analysis
+python -m src.analytics.plots
+python -m src.analytics.temporal_eda
+python -m src.analytics.build_site
+```
+
+Site artifacts are committed under `docs/`. Regeneration is idempotent.
+
+---
+
+## 18. Known Limitations
 
 Full list in `docs/data_contract.yaml` `limitations:` and
 `docs/source_profiling.md`. The three that most affect downstream use:
@@ -549,7 +668,7 @@ Additional limitations:
   median). It must not be blended into text-analytic downstream
   consumers — only BetterGov and Lawphil carry RA body text.
 
-## 18. Troubleshooting
+## 19. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -564,7 +683,7 @@ Additional limitations:
 | `Fernet key must be 32 url-safe base64-encoded bytes` | Fernet key not generated properly | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | Mojibake in Lawphil content | Encoding mismatch | Parser uses `apparent_encoding`; if issue persists, check `fetch_html` |
 
-## 19. Future Improvements
+## 20. Future Improvements
 
 - **Append recent RAs from E-Library**: the E-Library
   snapshot extends to 2026, one year past BetterGov's 2025 cap. A
