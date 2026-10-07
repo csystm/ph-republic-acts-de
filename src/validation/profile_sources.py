@@ -1,22 +1,28 @@
-"""Profile every source (raw + staging) and emit docs/source_profiling.md.
+"""Profile every source (raw + staging) and emit structured outputs.
 
 Reads:
   - data/raw/bettergov/repacts.parquet
   - data/raw/lawphil/_sample_manifest.json
-  - data/raw/lawphil/pages/*.html    (counted, not parsed)
+  - data/raw/lawphil/pages/*.html
+  - data/raw/elibrary/_manifest.json
+  - data/raw/elibrary/pages/*.json
   - data/staging/ra_bettergov_staged.parquet
   - data/staging/ra_lawphil_staged.parquet
+  - data/staging/ra_elibrary_staged.parquet   (optional; available later)
 
 Writes:
-  - docs/source_profiling.md
+  - data/profiling/sources_profile.json       (machine-readable)
+  - data/profiling/sources_profile.txt        (human-readable)
 
-Interpretive notes about known quality issues are derived from the data where
-possible; anything quoted from the project handoff is explicitly marked.
+Narrative documentation for the profiling deliverable lives in
+``docs/source_profiling.md`` and is hand-authored, citing numbers from the
+JSON this module produces. This module does not write to ``docs/``.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -24,24 +30,21 @@ from typing import Any
 import pandas as pd
 
 from src.utils.config import Settings
-from src.utils.io import atomic_write_text
+from src.utils.io import atomic_write_json, atomic_write_text
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 SAMPLE_LEN = 80
-HIGH_NULL_PCT = 5.0  # flag columns above this as a "notable" null issue
+HIGH_NULL_PCT = 5.0
 
-# Repo root, resolved from this file: src/validation/profile_sources.py -> parents[2]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _rel(p: Path) -> str:
     """Render a path relative to the repo root as `./posix/path`.
 
-    Falls back to the absolute path if `p` is outside the repo (e.g. an env
-    var points somewhere unexpected). This keeps the profiling report portable
-    across machines and avoids embedding the author's username in a shared doc.
+    Falls back to the absolute path if `p` is outside the repo.
     """
     p = Path(p)
     try:
@@ -50,7 +53,6 @@ def _rel(p: Path) -> str:
         return p.as_posix()
     return f"./{rel.as_posix()}"
 
-# Profiling primitives
 
 def _truncate(val: Any, n: int = SAMPLE_LEN) -> str:
     if val is None or (isinstance(val, float) and pd.isna(val)):
@@ -58,6 +60,10 @@ def _truncate(val: Any, n: int = SAMPLE_LEN) -> str:
     s = str(val).replace("\n", " ").replace("\r", " ").replace("|", "\\|").strip()
     return (s[: n - 1] + "…") if len(s) > n else s
 
+
+# ---------------------------------------------------------------------------
+# Profiling primitives
+# ---------------------------------------------------------------------------
 
 def profile_dataframe(df: pd.DataFrame) -> dict[str, Any]:
     """Per-column stats: dtype, non-null, null%, unique, sample."""
@@ -98,42 +104,13 @@ def numeric_summary(df: pd.DataFrame, col: str) -> dict[str, Any] | None:
     }
 
 
-# Markdown rendering
-
-def _render_columns_table(cols: list[dict[str, Any]]) -> str:
-    lines = [
-        "| Column | dtype | Non-null | Null | Null % | Unique | Sample |",
-        "|---|---|---:|---:|---:|---:|---|",
-    ]
-    for c in cols:
-        lines.append(
-            f"| `{c['name']}` | `{c['dtype']}` | {c['non_null']} | {c['null']} "
-            f"| {c['null_pct']:.2f} | {c['unique']} | {c['sample']} |"
-        )
-    return "\n".join(lines)
-
-
-def _render_numeric_table(num: dict[str, dict[str, Any]]) -> str:
-    if not num:
-        return "_No numeric columns profiled._"
-    lines = [
-        "| Column | Count | Min | P25 | Median | Mean | P75 | Max |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
-    ]
-    for col, s in num.items():
-        lines.append(
-            f"| `{col}` | {s['count']} | {s['min']:.4g} | {s['p25']:.4g} "
-            f"| {s['median']:.4g} | {s['mean']:.4g} | {s['p75']:.4g} | {s['max']:.4g} |"
-        )
-    return "\n".join(lines)
-
-
-def _detect_null_issues(profile: dict[str, Any]) -> list[str]:
+def _null_issues(profile: dict[str, Any]) -> list[str]:
     issues = []
     for c in profile["columns"]:
         if c["null"] > 0 and c["null_pct"] >= HIGH_NULL_PCT:
             issues.append(
-                f"`{c['name']}` is {c['null_pct']:.2f}% null ({c['null']}/{profile['rows']})."
+                f"`{c['name']}` is {c['null_pct']:.2f}% null "
+                f"({c['null']}/{profile['rows']})."
             )
         elif 0 < c["null"] and c["null_pct"] < HIGH_NULL_PCT:
             issues.append(
@@ -142,85 +119,75 @@ def _detect_null_issues(profile: dict[str, Any]) -> list[str]:
     return issues
 
 
-# Section builders
+def _absent(note: str) -> dict[str, Any]:
+    """Uniform 'source not yet available' shape."""
+    return {"present": False, "note": note}
 
-def _section_raw_bettergov(path: Path) -> tuple[str, dict[str, Any] | None]:
+
+# ---------------------------------------------------------------------------
+# Raw profiles
+# ---------------------------------------------------------------------------
+
+def _profile_raw_bettergov(path: Path) -> dict[str, Any]:
     if not path.exists():
-        return f"### Raw — BetterGov Parquet\n\n_Missing: `{path}`_\n", None
+        return _absent(f"missing: {_rel(path)}")
+
     df = pd.read_parquet(path)
     logger.info("profiled raw bettergov: %d rows x %d cols", *df.shape)
     profile = profile_dataframe(df)
 
-    # extra checks specific to this source, all derived from the data
     n_rows = len(df)
-    dup_content = int(df["content"].duplicated().sum()) if "content" in df.columns else 0
-    n_year_null = int(df["year"].isna().sum()) if "year" in df.columns else 0
-    n_index_basenames = (
-        int(df["basename"].str.match(r"^ra\d{4}$", case=False, na=False).sum())
-        if "basename" in df.columns else 0
-    )
-    n_month_null = int(df["month"].isna().sum()) if "month" in df.columns else 0
-    n_autotitle = (
-        int(df["title"].str.match(r"^Ra\d{4}$", case=False, na=False).sum())
-        if "title" in df.columns else 0
-    )
-
-    parts = [
-        "### Raw — BetterGov Parquet",
-        "",
-        f"**Path:** `{_rel(path)}`  ",
-        f"**Shape:** {profile['rows']:,} rows × {profile['cols']} columns  ",
-        f"**Format:** Parquet (33.92 MB, source-faithful)  ",
-        f"**Provider:** BetterGov Philippines — `bettergovph/gov-library` (HuggingFace)  ",
-        f"**License:** CC BY-NC 4.0  ",
-        "",
-        _render_columns_table(profile["columns"]),
-        "",
-        "**Derived checks:**",
-        f"- Duplicate `content` values: **{dup_content}**",
-        f"- Null `year` values: **{n_year_null}**",
-        "",
-    ]
+    derived: dict[str, Any] = {}
+    if "content" in df.columns:
+        derived["duplicate_content"] = int(df["content"].duplicated().sum())
     if "year" in df.columns:
+        derived["null_year"] = int(df["year"].isna().sum())
         ys = numeric_summary(df, "year")
         if ys:
-            parts += [
-                f"**Year range:** {int(ys['min'])}–{int(ys['max'])} "
-                f"(median {int(ys['median'])})",
-                "",
-            ]
+            derived["year_min"] = int(ys["min"])
+            derived["year_max"] = int(ys["max"])
+            derived["year_median"] = int(ys["median"])
+    if "basename" in df.columns:
+        derived["index_basename_rows"] = int(
+            df["basename"].str.match(r"^ra\d{4}$", case=False, na=False).sum()
+        )
+    if "month" in df.columns:
+        derived["null_month"] = int(df["month"].isna().sum())
+    if "title" in df.columns:
+        derived["autotitle_rows"] = int(
+            df["title"].str.match(r"^Ra\d{4}$", case=False, na=False).sum()
+        )
 
-    parts += [
-        "**Observed quality issues:**",
-        f"- `month` is {n_month_null}/{n_rows} null (100%) — unusable as a "
-        "partition key or filter dimension.",
-        f"- **{n_index_basenames}** rows are year-level index pages "
-        r"(`basename` matches `^ra\d{4}$`, no underscore). They carry no "
-        "RA-level content and are excluded from staging.",
-        f"- **{dup_content}** rows share identical `content` with another row — "
-        "the same markdown blob surfacing under two different basenames. These "
-        "become duplicate `ra_id` values once `ra_number` is parsed.",
-        f"- **{n_autotitle}** rows carry a bare `RaYYYY` placeholder in `title`. "
-        "Downstream consumers must treat `title` as a hint, not a canonical label.",
-        "- `content` is markdown with embedded links and bold markers; "
-        "the staging layer strips these into `content_clean`.",
-        "- Header presence in `content` is inconsistent. The staging parser "
-        "recovers **28** `ra_number` values from inline "
-        "`**REPUBLIC ACT No. X**` headers when the `basename` regex cannot "
-        "derive one — evidence that the header line is not reliably present.",
-        "- **24** rows are non-RA artifacts (IRRs, omnibus documents). The "
-        "staging parser drops them because no RA number is extractable from "
-        "either `basename` or `content`.",
-        "",
+    notes = [
+        "`month` is 100% null in this snapshot — unusable as a partition key.",
+        "Year-level index pages (basename ~ ^raYYYY$) carry no RA-level content "
+        "and are excluded from staging.",
+        "Duplicate `content` values surface the same markdown blob under two "
+        "different basenames; these become duplicate `ra_id` after parsing.",
+        "`content` is markdown with embedded links and bold markers; staging "
+        "strips these into `content_clean`.",
+        "Header presence in `content` is inconsistent — the staging parser "
+        "recovers some `ra_number` values from inline `**REPUBLIC ACT No. X**` "
+        "headers when basename parsing fails.",
     ]
-    return "\n".join(parts), {"profile": profile, "df": df}
+
+    return {
+        "present": True,
+        "path": _rel(path),
+        "format": "parquet",
+        "provider": "BetterGov Philippines — bettergovph/gov-library (HuggingFace)",
+        "license": "CC BY-NC 4.0",
+        **profile,
+        "derived": derived,
+        "notes": notes,
+    }
 
 
-def _section_raw_lawphil(raw_dir: Path) -> tuple[str, dict[str, Any] | None]:
+def _profile_raw_lawphil(raw_dir: Path) -> dict[str, Any]:
     manifest = raw_dir / "lawphil" / "_sample_manifest.json"
     pages_dir = raw_dir / "lawphil" / "pages"
     if not manifest.exists():
-        return f"### Raw — Lawphil HTML\n\n_Missing: `{manifest}`_\n", None
+        return _absent(f"missing: {_rel(manifest)}")
 
     entries = json.loads(manifest.read_text(encoding="utf-8"))
     df = pd.DataFrame(entries)
@@ -229,200 +196,335 @@ def _section_raw_lawphil(raw_dir: Path) -> tuple[str, dict[str, Any] | None]:
 
     pages = sorted(pages_dir.glob("*.html")) if pages_dir.exists() else []
     total_bytes = sum(p.stat().st_size for p in pages)
-    missing = len(entries) - len(pages)
 
-    parts = [
-        "### Raw — Lawphil HTML",
-        "",
-        f"**Manifest:** `{_rel(manifest)}`  ",
-        f"**Pages dir:** `{_rel(pages_dir)}`  ",
-        f"**Format:** HTML (Windows-1252 on disk; decoded via `apparent_encoding`)  ",
-        f"**Provider:** The Lawphil Project — Arellano Law Foundation  ",
-        f"**License:** Creative Commons (see site)  ",
-        f"**Sampling:** seeded random sample of 200 RAs (seed=42) from index of ~11,658  ",
-        "",
-        f"**Manifest shape:** {profile['rows']} entries × {profile['cols']} columns  ",
-        f"**HTML pages on disk:** {len(pages)} files, {total_bytes:,} bytes "
-        f"({total_bytes / 1024:.1f} KB)",
-        "",
-        _render_columns_table(profile["columns"]),
-        "",
-        "**Observed quality issues:**",
-        f"- Fetched pages: **{len(pages)}/{len(entries)}** manifest entries have "
-        f"a saved HTML file ({missing} missing). The scraper's skip-if-exists "
-        "logic makes reruns idempotent and does not overwrite successful fetches.",
-        "- The staging parser additionally skips **1** non-RA (IRR) entry "
-        "identified by the `irr_` filename prefix, yielding **199** staged rows.",
-        "- One malformed href was encountered during scraping (RA 6789: "
-        "`ra1989/\"ra_6789_1989.html\"`). The scraper's NFKC normalization plus "
-        "quote-stripping in `_clean_href` repaired it, and the page was fetched "
-        "normally.",
-        "- Source encodings are mixed (mostly Windows-1252). Naive decoding "
-        "produces mojibake (`Ã±`, `â€`); the scraper sets "
-        "`r.encoding = r.apparent_encoding` before extraction, which resolves "
-        "the majority of cases.",
-        "- Body HTML structure varies between pages (blockquote vs. `dir` "
-        "nesting). The parser accepts both.",
-        "",
+    derived = {
+        "manifest_entries": len(entries),
+        "html_pages_on_disk": len(pages),
+        "missing_pages": len(entries) - len(pages),
+        "total_bytes": total_bytes,
+        "avg_page_bytes": int(total_bytes / len(pages)) if pages else 0,
+    }
+
+    notes = [
+        "Mixed source encodings (mostly Windows-1252). Scraper sets "
+        "`r.encoding = r.apparent_encoding` to decode correctly.",
+        "Body HTML structure varies between pages (blockquote vs. dir nesting); "
+        "parser accepts both.",
+        "One malformed href (RA 6789) was NFKC-normalized and quote-stripped "
+        "during scraping.",
     ]
-    return "\n".join(parts), {"profile": profile, "df": df}
+
+    return {
+        "present": True,
+        "path": _rel(manifest),
+        "format": "html (windows-1252 on disk)",
+        "provider": "The Lawphil Project — Arellano Law Foundation",
+        "license": "Creative Commons (see site)",
+        **profile,
+        "derived": derived,
+        "notes": notes,
+    }
 
 
-def _section_staging(
+_RA_TITLE_RE = re.compile(r"^REPUBLIC ACT NO\. (\d+)\s*$")
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DOC_ID_RE = re.compile(r"showdocs/\d+/(\d+)")
+
+
+def _profile_raw_elibrary(raw_dir: Path) -> dict[str, Any]:
+    manifest_path = raw_dir / "elibrary" / "_manifest.json"
+    pages_dir = raw_dir / "elibrary" / "pages"
+
+    if not manifest_path.exists() or not pages_dir.exists():
+        return _absent(
+            f"missing: {_rel(manifest_path)} or {_rel(pages_dir)}"
+        )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    page_files = sorted(pages_dir.glob("page_*.json"))
+
+    all_rows: list[list] = []
+    per_page_counts: list[int] = []
+    for f in page_files:
+        d = json.loads(f.read_text(encoding="utf-8"))
+        rows = d.get("data", [])
+        per_page_counts.append(len(rows))
+        all_rows.extend(rows)
+
+    n_rows = len(all_rows)
+    n_pages = len(page_files)
+    logger.info("profiled raw elibrary: %d rows across %d pages", n_rows, n_pages)
+
+    shape_counter: dict[int, int] = {}
+    for r in all_rows:
+        shape_counter[len(r)] = shape_counter.get(len(r), 0) + 1
+
+    ra_rows, non_ra_rows, ra_numbers = [], [], []
+    for r in all_rows:
+        title = r[0] if len(r) > 0 else ""
+        m = _RA_TITLE_RE.match(title or "")
+        if m:
+            ra_rows.append(r)
+            ra_numbers.append(int(m.group(1)))
+        else:
+            non_ra_rows.append(r)
+
+    dates_present = [r[1] for r in all_rows if len(r) > 1 and r[1]]
+    dates_iso = [d for d in dates_present if _ISO_DATE_RE.match(d)]
+    dates_bad = [d for d in dates_present if not _ISO_DATE_RE.match(d)]
+    years_from_dates = sorted({int(d[:4]) for d in dates_iso}) if dates_iso else []
+
+    anchors_present = [r[2] for r in all_rows if len(r) > 2 and r[2]]
+    doc_ids = []
+    for r in all_rows:
+        a = r[2] if len(r) > 2 else ""
+        m = _DOC_ID_RE.search(a or "")
+        if m:
+            doc_ids.append(m.group(1))
+
+    num_counter: dict[int, int] = {}
+    for n in ra_numbers:
+        num_counter[n] = num_counter.get(n, 0) + 1
+    dupes = {n: c for n, c in num_counter.items() if c > 1}
+
+    derived: dict[str, Any] = {
+        "manifest_pages": manifest.get("pages"),
+        "manifest_records_total": manifest.get("records_total"),
+        "manifest_records_fetched": manifest.get("records_fetched"),
+        "manifest_complete": manifest.get("complete"),
+        "page_files_on_disk": n_pages,
+        "total_rows": n_rows,
+        "row_length_distribution": {str(k): v for k, v in sorted(shape_counter.items())},
+        "per_page_min": min(per_page_counts) if per_page_counts else 0,
+        "per_page_max": max(per_page_counts) if per_page_counts else 0,
+        "ra_rows": len(ra_rows),
+        "non_ra_rows": len(non_ra_rows),
+        "dates_present": len(dates_present),
+        "dates_iso": len(dates_iso),
+        "dates_non_iso": len(dates_bad),
+        "anchors_present": len(anchors_present),
+        "doc_ids_extracted": len(doc_ids),
+        "duplicate_ra_numbers": len(dupes),
+    }
+    if ra_numbers:
+        derived["ra_number_min"] = min(ra_numbers)
+        derived["ra_number_max"] = max(ra_numbers)
+    if years_from_dates:
+        derived["approval_year_min"] = years_from_dates[0]
+        derived["approval_year_max"] = years_from_dates[-1]
+
+    sample_ra = [r[0] for r in ra_rows[:5]]
+    sample_non_ra = [r[0] for r in non_ra_rows[:5] if r]
+
+    notes = [
+        "Row schema is a 3-tuple: [title, approval_date (ISO-8601), html_anchor].",
+        "Non-RA rows (IRR, resolutions) are dropped at parse via "
+        "`^REPUBLIC ACT NO\\. \\d+$` on the title.",
+        "Index is metadata-only — no body text. `content_clean` in staging is "
+        "populated from the title.",
+        "Approval dates are already ISO-8601; no date normalization required.",
+        "The `doc_id` extracted from the anchor's `showdocs/<n>/<doc_id>` "
+        "path populates `source_path` for the E-Library source.",
+    ]
+
+    return {
+        "present": True,
+        "path": _rel(manifest_path),
+        "format": "json (datatables-shaped, POST /republic_acts/fetch_ra)",
+        "provider": "Supreme Court of the Philippines — E-Library",
+        "license": "Public domain (Philippine government work)",
+        "rows": n_rows,
+        "cols": 3,
+        "columns": [],  # JSON rows are tuples, not named columns
+        "derived": derived,
+        "notes": notes,
+        "samples": {
+            "ra_titles_first_5": sample_ra,
+            "non_ra_titles_first_5": sample_non_ra,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Staging profiles
+# ---------------------------------------------------------------------------
+
+def _profile_staging(
     name: str, path: Path, *, check_ra_id_unique: bool = True
-) -> tuple[str, dict[str, Any] | None]:
+) -> dict[str, Any]:
     if not path.exists():
-        return f"### Staging — {name}\n\n_Missing: `{path}`_\n", None
+        return _absent(f"not yet generated: {_rel(path)}")
+
     df = pd.read_parquet(path)
     logger.info("profiled staging %s: %d rows x %d cols", name, *df.shape)
     profile = profile_dataframe(df)
 
-    parts = [
-        f"### Staging — {name}",
-        "",
-        f"**Path:** `{_rel(path)}`  ",
-        f"**Shape:** {profile['rows']:,} rows × {profile['cols']} columns",
-        "",
-        _render_columns_table(profile["columns"]),
+    numeric_cols = [c for c in ("ra_year", "content_length", "word_count")
+                    if c in df.columns]
+    numeric = {c: numeric_summary(df, c) for c in numeric_cols}
+    numeric = {k: v for k, v in numeric.items() if v}
+
+    derived: dict[str, Any] = {}
+    if check_ra_id_unique and "ra_id" in df.columns:
+        derived["duplicate_ra_id"] = int(df["ra_id"].duplicated().sum())
+    if "ra_year" in df.columns:
+        derived["null_ra_year"] = int(df["ra_year"].isna().sum())
+        ys = numeric_summary(df, "ra_year")
+        if ys:
+            derived["ra_year_min"] = int(ys["min"])
+            derived["ra_year_max"] = int(ys["max"])
+    if "title" in df.columns:
+        derived["empty_title"] = int(
+            (df["title"].astype(str).str.strip() == "").sum()
+        )
+    null_notes = _null_issues(profile)
+
+    return {
+        "present": True,
+        "path": _rel(path),
+        "format": "parquet",
+        **profile,
+        "numeric": numeric,
+        "derived": derived,
+        "notes": null_notes,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Text rendering
+# ---------------------------------------------------------------------------
+
+def _render_section_txt(data: dict[str, Any], lines: list[str]) -> None:
+    for k in ("path", "format", "provider", "license"):
+        if k in data:
+            lines.append(f"  {k:20s} {data[k]}")
+    for k in ("rows", "cols"):
+        if k in data:
+            lines.append(f"  {k:20s} {data[k]:,}")
+
+    if data.get("columns"):
+        lines.append("")
+        lines.append("  COLUMNS")
+        lines.append(
+            f"  {'name':26s} {'dtype':14s} {'non_null':>10s} {'null':>8s} "
+            f"{'null%':>7s} {'uniq':>8s}  sample"
+        )
+        lines.append("  " + "-" * 100)
+        for c in data["columns"]:
+            lines.append(
+                f"  {c['name'][:26]:26s} {c['dtype'][:14]:14s} "
+                f"{c['non_null']:>10,} {c['null']:>8,} {c['null_pct']:>7.2f} "
+                f"{c['unique']:>8,}  {c['sample'][:40]}"
+            )
+
+    if data.get("numeric"):
+        lines.append("")
+        lines.append("  NUMERIC")
+        for col, s in data["numeric"].items():
+            lines.append(
+                f"    {col:22s} n={s['count']:,}  "
+                f"min={s['min']:.4g}  p25={s['p25']:.4g}  "
+                f"med={s['median']:.4g}  mean={s['mean']:.4g}  "
+                f"p75={s['p75']:.4g}  max={s['max']:.4g}"
+            )
+
+    if data.get("derived"):
+        lines.append("")
+        lines.append("  DERIVED")
+        for k, v in data["derived"].items():
+            lines.append(f"    {k:32s} {v}")
+
+    if data.get("samples"):
+        lines.append("")
+        lines.append("  SAMPLES")
+        for k, vals in data["samples"].items():
+            lines.append(f"    {k}:")
+            for v in vals:
+                lines.append(f"      - {v!r}")
+
+    if data.get("notes"):
+        lines.append("")
+        lines.append("  NOTES")
+        for n in data["notes"]:
+            lines.append(f"    - {n}")
+
+
+def _render_txt(profile: dict[str, Any]) -> str:
+    lines = [
+        "=" * 100,
+        f"SOURCE PROFILE — generated {profile['generated_at']}",
+        "=" * 100,
         "",
     ]
-
-    numeric_cols = [c for c in ("ra_year", "content_length", "word_count") if c in df.columns]
-    num = {c: numeric_summary(df, c) for c in numeric_cols}
-    num = {k: v for k, v in num.items() if v}
-    if num:
-        parts += ["**Numeric summaries:**", "", _render_numeric_table(num), ""]
-
-    # data-derived issues
-    derived: list[str] = []
-    if check_ra_id_unique and "ra_id" in df.columns:
-        dup_ids = int(df["ra_id"].duplicated().sum())
-        derived.append(f"Duplicate `ra_id`: **{dup_ids}**")
-    if "ra_year" in df.columns:
-        null_year = int(df["ra_year"].isna().sum())
-        derived.append(f"Null `ra_year`: **{null_year}**")
-    if "title" in df.columns:
-        empty_titles = int((df["title"].astype(str).str.strip() == "").sum())
-        derived.append(f"Empty/whitespace `title`: **{empty_titles}**")
-    derived += _detect_null_issues(profile)
-
-    if derived:
-        parts += ["**Derived data-quality observations:**"]
-        parts += [f"- {d}" for d in derived]
-        parts.append("")
-
-    return "\n".join(parts), {"profile": profile, "df": df}
+    for src_name, sections in profile["sources"].items():
+        for layer, data in sections.items():
+            lines.append("-" * 100)
+            lines.append(f"{src_name}.{layer}")
+            lines.append("-" * 100)
+            if not data or not data.get("present", False):
+                note = (data or {}).get("note", "not available")
+                lines.append(f"  (skipped: {note})")
+                lines.append("")
+                continue
+            _render_section_txt(data, lines)
+            lines.append("")
+    return "\n".join(lines)
 
 
-def _section_cross_source(
-    bg: dict[str, Any] | None, lp: dict[str, Any] | None
-) -> str:
-    if not (bg and lp):
-        return "## Cross-source comparison\n\n_Not enough staging data to compare._\n"
-    a, b = bg["df"], lp["df"]
-    a_ids = set(a["ra_id"].dropna()) if "ra_id" in a.columns else set()
-    b_ids = set(b["ra_id"].dropna()) if "ra_id" in b.columns else set()
-    overlap = a_ids & b_ids
+# ---------------------------------------------------------------------------
+# Assembly
+# ---------------------------------------------------------------------------
 
-    a_years = set(a["ra_year"].dropna().astype(int)) if "ra_year" in a.columns else set()
-    b_years = set(b["ra_year"].dropna().astype(int)) if "ra_year" in b.columns else set()
+def build_profile(settings: Settings) -> dict[str, Any]:
+    raw = settings.raw_dir
+    stg = settings.staging_dir
 
-    return "\n".join([
-        "## Cross-source comparison",
-        "",
-        f"- BetterGov staged rows: **{len(a):,}**",
-        f"- Lawphil staged rows: **{len(b):,}**",
-        f"- `ra_id` overlap (present in both): **{len(overlap)}**",
-        f"- Unique to BetterGov: **{len(a_ids - b_ids):,}**",
-        f"- Unique to Lawphil: **{len(b_ids - a_ids)}**",
-        f"- Combined after dedupe (keep BetterGov on overlap): **{len(a_ids | b_ids):,}**",
-        "",
-        f"- BetterGov year span: {min(a_years) if a_years else '—'}–{max(a_years) if a_years else '—'}",
-        f"- Lawphil year span: {min(b_years) if b_years else '—'}–{max(b_years) if b_years else '—'}",
-        "",
-        "**Merge policy:** concat both staged Parquets, drop Lawphil rows whose "
-        "`ra_id` also exists in BetterGov, keep the BetterGov row. Lawphil-only "
-        "rows are retained and flagged via the `source` column.",
-        "",
-    ])
+    ts = datetime.now(timezone.utc).isoformat()
 
+    sources = {
+        "bettergov": {
+            "raw": _profile_raw_bettergov(raw / "bettergov" / "repacts.parquet"),
+            "staging": _profile_staging(
+                "BetterGov", stg / "ra_bettergov_staged.parquet"
+            ),
+        },
+        "lawphil": {
+            "raw": _profile_raw_lawphil(raw),
+            "staging": _profile_staging(
+                "Lawphil", stg / "ra_lawphil_staged.parquet"
+            ),
+        },
+        "elibrary": {
+            "raw": _profile_raw_elibrary(raw),
+            "staging": _profile_staging(
+                "E-Library", stg / "ra_elibrary_staged.parquet"
+            ),
+        },
+    }
 
-# Entry point
-
-def build_report(settings: Settings) -> str:
-    raw_bg = settings.raw_dir / "bettergov" / "repacts.parquet"
-    staging_bg = settings.staging_dir / "ra_bettergov_staged.parquet"
-    staging_lp = settings.staging_dir / "ra_lawphil_staged.parquet"
-
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-
-    s_raw_bg, prof_raw_bg = _section_raw_bettergov(raw_bg)
-    s_raw_lp, _ = _section_raw_lawphil(settings.raw_dir)
-    s_stg_bg, prof_stg_bg = _section_staging("BetterGov", staging_bg)
-    s_stg_lp, prof_stg_lp = _section_staging("Lawphil", staging_lp)
-    s_cross = _section_cross_source(prof_stg_bg, prof_stg_lp)
-
-    header = "\n".join([
-        "# Source Profiling Report",
-        "",
-        f"**Generated:** {ts}  ",
-        "**Project:** DSS150P — Philippine Republic Acts similarity & consolidation  ",
-        "**Scope:** raw + staging layers for both sources (BetterGov Parquet, Lawphil HTML)  ",
-        "",
-        "This report is regenerated by `python -m src.validation.profile_sources`. "
-        "All figures below are computed from the current on-disk artifacts. "
-        "Qualitative notes are direct observations from inspecting the source "
-        "data and the output of the ingestion and staging pipeline.",
-        "",
-        "---",
-        "",
-        "## 1. Raw — BetterGov Parquet",
-        "",
-        s_raw_bg.split("### Raw — BetterGov Parquet\n\n", 1)[-1],
-        "## 2. Raw — Lawphil HTML",
-        "",
-        s_raw_lp.split("### Raw — Lawphil HTML\n\n", 1)[-1],
-        "## 3. Staging — BetterGov",
-        "",
-        s_stg_bg.split("### Staging — BetterGov\n\n", 1)[-1],
-        "## 4. Staging — Lawphil",
-        "",
-        s_stg_lp.split("### Staging — Lawphil\n\n", 1)[-1],
-        s_cross,
-        "## 5. Limitations and risks",
-        "",
-        "- **Coverage skew.** BetterGov carries ~12K RAs; Lawphil is a 200-RA "
-        "sample. Lawphil is therefore a cross-source *validation* set, not a bulk "
-        "source. Any downstream claim about \"the corpus\" refers to BetterGov unless "
-        "stated otherwise.",
-        "- **`approval_date` nullability (~35% in BetterGov).** Some source texts "
-        "omit the `Approved:` line. Downstream analytics must fall back to `ra_year` "
-        "when this field is null. Documented in the data contract (Step E).",
-        "- **`content_clean` is markdown-stripped but not case/boilerplate-normalized.** "
-        "TF-IDF in analytics will use `content_normalized` (Step C), not this column.",
-        "- **`ra_id` is a synthetic key** — a stable concatenation of source and RA "
-        "number, not a source-native identifier. The Postgres schema pairs it with a "
-        "`UNIQUE (ra_number, ra_year)` constraint to catch collisions.",
-        "- **Mojibake risk in Lawphil.** `apparent_encoding` mitigates but does not "
-        "eliminate mixed-encoding artifacts. Visual spot-checks in Step C.",
-        "- **BetterGov is a static snapshot.** Update frequency unknown; the pipeline "
-        "is designed for rerun, not incremental sync.",
-        "",
-        "---",
-        "",
-        "_End of profiling report._",
-        "",
-    ])
-    return header
+    return {"generated_at": ts, "sources": sources}
 
 
 def main() -> None:
     settings = Settings()
-    logger.info("building source profiling report")
-    md = build_report(settings)
-    dest = Path("docs") / "source_profiling.md"
-    atomic_write_text(md, dest)
-    logger.info("profiling report written to %s (%d chars)", dest, len(md))
+    logger.info("building source profile")
+
+    profile = build_profile(settings)
+
+    out_dir = settings.data_dir / "profiling"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    json_dest = out_dir / "sources_profile.json"
+    txt_dest = out_dir / "sources_profile.txt"
+
+    atomic_write_json(profile, json_dest)
+    atomic_write_text(_render_txt(profile), txt_dest)
+
+    logger.info(
+        "profile written: %s (%d bytes), %s (%d bytes)",
+        json_dest, json_dest.stat().st_size,
+        txt_dest, txt_dest.stat().st_size,
+    )
 
 
 if __name__ == "__main__":

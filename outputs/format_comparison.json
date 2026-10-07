@@ -5,10 +5,10 @@
     {
       "format": "parquet_single",
       "path": "data/curated/ra_master.parquet",
-      "size_bytes": 64614082,
-      "size_mb": 64.614,
-      "write_seconds": 0.469,
-      "read_seconds": 0.253,
+      "size_bytes": 64619432,
+      "size_mb": 64.619,
+      "write_seconds": 1.087,
+      "read_seconds": 0.805,
       "rows": 11969,
       "columns_match": true,
       "rows_match": true
@@ -16,10 +16,10 @@
     {
       "format": "parquet_partitioned",
       "path": "data/curated/ra_master_partitioned",
-      "size_bytes": 65942138,
-      "size_mb": 65.942,
-      "write_seconds": 0.863,
-      "read_seconds": 0.199,
+      "size_bytes": 65947067,
+      "size_mb": 65.947,
+      "write_seconds": 4.334,
+      "read_seconds": 0.886,
       "rows": 11969,
       "columns_match": true,
       "rows_match": true
@@ -27,10 +27,10 @@
     {
       "format": "csv",
       "path": "outputs/ra_master.csv",
-      "size_bytes": 167359391,
-      "size_mb": 167.359,
-      "write_seconds": 1.968,
-      "read_seconds": 1.306,
+      "size_bytes": 167389011,
+      "size_mb": 167.389,
+      "write_seconds": 7.77,
+      "read_seconds": 2.262,
       "rows": 11969,
       "columns_match": true,
       "rows_match": true
@@ -38,10 +38,10 @@
     {
       "format": "json_lines",
       "path": "outputs/ra_master.jsonl",
-      "size_bytes": 169969877,
-      "size_mb": 169.97,
-      "write_seconds": 0.712,
-      "read_seconds": 0.849,
+      "size_bytes": 170003149,
+      "size_mb": 170.003,
+      "write_seconds": 2.216,
+      "read_seconds": 2.015,
       "rows": 11969,
       "columns_match": true,
       "rows_match": true
@@ -50,13 +50,13 @@
   "selected_partition_demo": {
     "year": 2015,
     "rows_read": 85,
-    "read_seconds": 0.0058
+    "read_seconds": 0.0254
   },
   "partition_stats": {
     "n_partitions": 66,
     "years_min": 1946,
     "years_max": 2025,
-    "total_bytes": 65942138,
-    "write_seconds": 0.863
+    "total_bytes": 65947067,
+    "write_seconds": 4.334
   }
 }

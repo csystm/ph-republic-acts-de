@@ -23,6 +23,7 @@ x-airflow-common: &airflow-common
     - ./sql:/opt/airflow/sql
     - ./outputs:/opt/airflow/outputs
     - ./docs:/opt/airflow/docs
+    - ./certs:/opt/airflow/certs
   depends_on:
     postgres:
       condition: service_healthy

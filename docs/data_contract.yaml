@@ -7,8 +7,8 @@
 #
 # Field-level reference (human-readable) lives in docs/data_dictionary.md.
 
-contract_version: "1.0"
-effective: "2026-09-27"
+contract_version: "1.2"
+effective: "2026-10-06"
 status: active
 owner:
   project: "DSS150P — Philippine Republic Acts"
@@ -30,6 +30,9 @@ producers:
     - path: data/staging/ra_lawphil_staged.parquet
       role: cross-source validation
       approx_rows: 200
+    - path: data/staging/ra_elibrary_staged.parquet
+      role: approval_date lookup
+      approx_rows: 12150
   write_semantics:
     mode: full_replace
     atomic: true
@@ -85,10 +88,14 @@ schema:
       type: string
       format: date
       nullable: true
-      null_rate_observed: 0.3523
+      null_rate_observed: 0.0048
       description: >
-        ISO 8601 date of approval. Null when source has neither an
-        'Approved:' line nor an inline header date.
+        ISO 8601 date of approval. Populated from the source's 'Approved:'
+        line or inline header date where present. Nulls in the BetterGov
+        base are gap-filled from the Supreme Court E-Library staged layer
+        (see docs/data_flow.md §2.1 and §4). After gap-fill,
+        58 of 11,969 curated rows (0.48%) remain null — these are RAs whose
+        approval dates are absent from both BetterGov and E-Library.
       example: "2015-07-16"
     - name: content_clean
       type: string
@@ -113,7 +120,7 @@ schema:
     - name: source
       type: string
       nullable: false
-      allowed_values: [bettergov_parquet, lawphil_html]
+      allowed_values: [bettergov_parquet, lawphil_html, elibrary_json]
       description: "Provenance tag"
       example: "bettergov_parquet"
     - name: source_path
@@ -194,7 +201,7 @@ failure_surfaces:
   - outputs/validation_report.json (per-check pass/fail + samples)
 
 refresh:
-  trigger: "Airflow DAG ra_pipeline (schedule=None for demo; @weekly in production)"
+  trigger: "Airflow DAG ra_pipeline (schedule='0 2 1 * *' — monthly, 1st at 02:00; DAG is paused by default for demo control)"
   mode: full_recompute
   rerun_safety: atomic_writes_and_postgres_upsert
   expected_runtime_seconds:
@@ -203,6 +210,7 @@ refresh:
   source_dependencies:
     - "HuggingFace: bettergovph/gov-library"
     - "lawphil.net HTML index and pages"
+    - "elibrary.judiciary.gov.ph JSON API"
 
 limitations:
   - id: coverage_skew
@@ -212,8 +220,11 @@ limitations:
     ref: docs/source_profiling.md
   - id: approval_date_nullability
     description: >
-      ~35% of rows have null approval_date. Downstream analytics must fall
-      back to ra_year when null.
+      After gap-fill from the Supreme Court E-Library, 58 of
+      11,969 curated rows (0.48%) have null approval_date. The residual
+      nulls are RAs whose approval dates are absent from both BetterGov
+      and E-Library. Downstream analytics may fall back to ra_year for
+      these.
   - id: duplicate_ra_id_resolution
     description: >
       Three ra_id values (RA-6426, RA-7663, RA-7688) appear under two source
@@ -230,8 +241,33 @@ limitations:
   - id: synthetic_ra_id
     description: >
       ra_id is not a source-native identifier. See schema.unique_constraints.
+  - id: elibrary_metadata_only
+    description: >
+      The Supreme Court E-Library supplies RA number, approval date, and a
+      document URL — no body text. Its staged rows carry the descriptive
+      title from the anchor text (or the RA label as a fallback) as
+      content_clean. This is intentional: Policy B uses the E-Library staged
+      frame only as a lookup table to gap-fill approval_date; E-Library rows
+      never enter the curated ra_master and never participate in content
+      validation.
+    ref: src/transform/parse_elibrary.py
 
 change_log:
   - version: "1.0"
     date: "2026-09-27"
     change: "Initial contract. 11 fields, 10 validation rules."
+  - version: "1.1"
+    date: "2026-10-05"
+    change: >
+      Add elibrary_json as a source value. Register the E-Library staged
+      Parquet as an approval_date lookup input to merge_sources. Note the
+      metadata-only limitation. No schema fields added or removed.
+  - version: "1.2"
+    date: "2026-10-06"
+    change: >
+      Descriptive refresh after third-source integration. Update
+      approval_date.null_rate_observed from 0.3523 (pre-gap-fill BetterGov
+      staged) to 0.0048 (post-Policy-B curated); correct refresh.trigger
+      to the actual monthly schedule; refresh the approval_date_nullability
+      limitation text. No schema fields added or removed; no validation
+      rules changed; no constraint modified. Fully backward-compatible.
