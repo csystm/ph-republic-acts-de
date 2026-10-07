@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.utils.config import settings
 from src.utils.logger import get_logger
 
-from sqlalchemy import MetaData, Table, create_engine, text, literal_column
+from sqlalchemy import literal_column
 
 logger = get_logger(__name__)
 
