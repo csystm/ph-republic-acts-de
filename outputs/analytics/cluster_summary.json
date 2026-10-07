@@ -1,0 +1,332 @@
+{
+  "0": {
+    "size": 437,
+    "year_min": 1946,
+    "year_max": 2004,
+    "representatives": [
+      {
+        "ra_id": "RA-1212",
+        "title": "An Act Creating the Municipality of San Jose, Province of Negros Oriental",
+        "ra_year": 1955
+      },
+      {
+        "ra_id": "RA-4748",
+        "title": "An Act Creating the Municipality of Kiblawan, Province of Davao",
+        "ra_year": 1966
+      },
+      {
+        "ra_id": "RA-5659",
+        "title": "Republic Act No. 5659",
+        "ra_year": 1969
+      }
+    ]
+  },
+  "1": {
+    "size": 346,
+    "year_min": 1949,
+    "year_max": 1972,
+    "representatives": [
+      {
+        "ra_id": "RA-5245",
+        "title": "An Act Granting Alberto Rodriguez a Temporary Permit to Construct, Maintain and Operate Privatized Fixed Point-to-Point and Land-Based and Land-Mobile Radio Stations for the Reception and Transmission of Radio Communications Within the Philippines",
+        "ra_year": 1968
+      },
+      {
+        "ra_id": "RA-4457",
+        "title": "An Act Granting the Central Azucarera De Bais a Temporary Permit to Construct, Maintain and Operate Private Fixed Point-to-Point and Land-Based and Land Mobile Radio Stations for the Reception and Transmission of Radio Communications Within the Philippines",
+        "ra_year": 1965
+      },
+      {
+        "ra_id": "RA-4597",
+        "title": "An Act Granting F.K. Belleza a Temporary Permit to Construct, Maintain and Operate Private Fixed Point-to-Point and Land-Based and Land-Mobile Radio Stations for the Reception and Transmission of Radio Communications Within the Philippines",
+        "ra_year": 1965
+      }
+    ]
+  },
+  "2": {
+    "size": 1667,
+    "year_min": 1949,
+    "year_max": 2025,
+    "representatives": [
+      {
+        "ra_id": "RA-10194",
+        "title": "AN ACT SEPARATING THE BANAYBANAY NATIONAL HIGH SCHOOL LEANDRO G. JAPOS HIGH SCHOOL ANNEX IN BARANGAY PISO, MUNICIPALITY OF BANAYBANAY, PROVINCE OF DAVAO ORIENTAL FROM THE BANAYBANAY NATIONAL HIGH SCHOOL CONVERTING IT INTO AN INDEPENDENT NATIONAL HIGH SCHOOL TO BE KNOWN AS LEANDRO G. JAPOS NATIONAL HIGH SCHOOL AND APPROPRIATING FUNDS THEREFOR",
+        "ra_year": 2012
+      },
+      {
+        "ra_id": "RA-9788",
+        "title": "AN ACT SEPARATING THE MABA-AY NATIONAL HIGH SCHOOL - BANSA ANNEX IN BARANGAY BANSA, MUNICIPALITY OF BAUKO MOUNTAIN PROVINCE FROM THE MABA-AY NATIONAL HIGH SCHOOL, CONVERTING IT INTO AN INDEPENDENT NATIONAL HIGH SCHOOL TO BE KNOWN AS BANSA NATIONAL HIGH SCHOOL AND APPROPRIATING FUNDS THEREFOR",
+        "ra_year": 2009
+      },
+      {
+        "ra_id": "RA-9664",
+        "title": "AN ACT SEPERATING THE PANTBANGAN NATIONAL HIGH SCHOOL GANDUZ ANNEX IN BARANGAY GANDUZ, MUNICIPALITY OF PANTABANGAN NATIONAL HIGH SCHOOL, CONVERTING IT INTO AN INDEPENDENT NATIONAL HIGH SCHOOL TO BE KNOWN AS GANDUZ NATIONAL HIGH SCHOOL AND APPROPRIATING FUNDS THEREFOR",
+        "ra_year": 2009
+      }
+    ]
+  },
+  "3": {
+    "size": 459,
+    "year_min": 1946,
+    "year_max": 2025,
+    "representatives": [
+      {
+        "ra_id": "RA-5225",
+        "title": "An Act Providing for the Establishment of an Emergency Hospital in the City of Tangub, and Authorizing the Appropriation of Funds Therefor",
+        "ra_year": 1968
+      },
+      {
+        "ra_id": "RA-2693",
+        "title": "An Act Providing for the Establishment of an Emergency Hospital in the Municipality of Sogod, Province of Leyte, to be Known as the Sogod Emergency Hospital, and Authorizing the Appropriation of Funds Therefor",
+        "ra_year": 1960
+      },
+      {
+        "ra_id": "RA-4957",
+        "title": "An Act Converting Abuyog Emergency Hospital in the Municipality of Abuyog, Province of Leyte, into Abuyog General Hospital and Authorizing the Appropriation of Funds Therefor",
+        "ra_year": 1967
+      }
+    ]
+  },
+  "4": {
+    "size": 305,
+    "year_min": 1953,
+    "year_max": 2025,
+    "representatives": [
+      {
+        "ra_id": "RA-4404",
+        "title": "An Act Changing the Name of Ticulon Elementary School in the Municipality of Malita, Province of Davao, to Toribio Limcaoco Elementary School",
+        "ra_year": 1965
+      },
+      {
+        "ra_id": "RA-6838",
+        "title": "An Act Changing the Name of the Suop Elementary School in Barangay Igangon, Municipality of Asuncion, Province of Davao, to Igangon Elementary School",
+        "ra_year": 1990
+      },
+      {
+        "ra_id": "RA-3505",
+        "title": "An Act Changing the Name of the Tinio-an Elementary School in the Municipality of Cabanatuan, Province of Iloilo, to Doroteo Lujan Elementary School",
+        "ra_year": 1962
+      }
+    ]
+  },
+  "5": {
+    "size": 1097,
+    "year_min": 1947,
+    "year_max": 2025,
+    "representatives": [
+      {
+        "ra_id": "RA-11437",
+        "title": "An Act Establishing a Regular District Office of the Land Transportation Office (LTO) in the Municipality of Ronda in the 7th District of the Province of Cebu and Appropriating Funds Therefor",
+        "ra_year": 2019
+      },
+      {
+        "ra_id": "RA-12130",
+        "title": "AN ACT CONVERTING THE LAND TRANSPORTATION OFFICE URDANETA DISTRICT OFFICE INTO A CLASS \"A\" DISTRICT OFFICE, RENAMING THE SAME AS THE LAND TRANSPORTATION OFFICE BINALONAN DISTRICT OFFICE AND APPROPRIATING FUNDS THEREFOR",
+        "ra_year": 2025
+      },
+      {
+        "ra_id": "RA-11743",
+        "title": "Eighteenth Congress Third Regular Session",
+        "ra_year": 2022
+      }
+    ]
+  },
+  "6": {
+    "size": 297,
+    "year_min": 1946,
+    "year_max": 2023,
+    "representatives": [
+      {
+        "ra_id": "RA-5502",
+        "title": "AN ACT REVISING REPUBLIC ACT NUMBERED THIRTY-TWO HUNDRED AND SEVENTY-EIGHT OTHERWISE KNOWN AS THE CHARTER OF THE CITY OF CALOOCAN.",
+        "ra_year": 1969
+      },
+      {
+        "ra_id": "RA-4354",
+        "title": "AN ACT TO REVERSE THE CHARTER OF THE CITY OF DAVAO AND FOR OTHER PURPOSES",
+        "ra_year": 1965
+      },
+      {
+        "ra_id": "RA-9393",
+        "title": "AN ACT CONVERTING THE MUNICIPALITY OF LAMITAN IN THE PROVINCE OF BASILAN INTO A COMPONENT CITY TO BE KNOWN AS THE CITY OF LAMITAN",
+        "ra_year": 2007
+      }
+    ]
+  },
+  "7": {
+    "size": 429,
+    "year_min": 1957,
+    "year_max": 2025,
+    "representatives": [
+      {
+        "ra_id": "RA-7415",
+        "title": "AN ACT INCREASING THE BED CAPACITY OF THE CADIZ DISTRICT HOSPITAL FROM A TWENTY-FIVE-BED CAPACITY TO A ONE HUNDRED-BED CAPACITY, AND APPROPRIATING FUNDS THEREFOR",
+        "ra_year": 1992
+      },
+      {
+        "ra_id": "RA-7312",
+        "title": "Fifth Regular Session",
+        "ra_year": 1992
+      },
+      {
+        "ra_id": "RA-7207",
+        "title": "AN ACT INCREASING THE BED CAPACITY OF THE MARGOSATUBIG DISTRICT HOSPITAL FROM TWENTY-FIVE (25) TO FIFTY (50) BEDS, AND APPROPRIATING FUNDS THEREFOR",
+        "ra_year": 1992
+      }
+    ]
+  },
+  "8": {
+    "size": 648,
+    "year_min": 1947,
+    "year_max": 1972,
+    "representatives": [
+      {
+        "ra_id": "RA-2592",
+        "title": "An Act Creating Certain Barrios in the Province of Camarines Sur",
+        "ra_year": 1959
+      },
+      {
+        "ra_id": "RA-1733",
+        "title": "An Act Changing the Names of Certain Barrios in the Municipality of Sara, Province of Iloilo",
+        "ra_year": 1957
+      },
+      {
+        "ra_id": "RA-3354",
+        "title": "An Act to Change the Names of Certain Barrios in the Municipality of Sara, Province of Iloilo",
+        "ra_year": 1961
+      }
+    ]
+  },
+  "9": {
+    "size": 745,
+    "year_min": 1946,
+    "year_max": 2015,
+    "representatives": [
+      {
+        "ra_id": "RA-2414",
+        "title": "An Act Authorizing the Appropriation of the Sum of Two Hundred Thousand Pesos for the Operation and Maintenance of the Aparri Vocational High School",
+        "ra_year": 1959
+      },
+      {
+        "ra_id": "RA-4298",
+        "title": "An Act Authorizing the Appropriation of Three Hundred Thousand Pesos for the Operation and Maintenance of Cabalian National Vocational High School",
+        "ra_year": 1965
+      },
+      {
+        "ra_id": "RA-2409",
+        "title": "An Act Authorizing the Appropriation of the Sum of One Hundred Fifty Thousand Pesos for the Operation and Maintenance of the Aparri Fisheries School",
+        "ra_year": 1959
+      }
+    ]
+  },
+  "10": {
+    "size": 279,
+    "year_min": 1949,
+    "year_max": 2025,
+    "representatives": [
+      {
+        "ra_id": "RA-8292",
+        "title": "AN ACT PROVIDING FOR THE UNIFORM COMPOSITION AND POWERS OF THE GOVERNING BOARDS, THE MANNER OF APPOINTMENT AND TERM OF OFFICE OF THE PRESIDENT OF CHARTERED STATE UNIVERSITIES AND COLLEGES, AND FOR OTHER PURPOSES",
+        "ra_year": 1997
+      },
+      {
+        "ra_id": "RA-9744",
+        "title": "AN ACT CONVERTING THE CEBU STATE COLLEGE OF SCIENCE AND TECHNOLOGY SYSTEM IN THE CITY OF CEBU STATE COLLEGE OF SCIENCE AND TECHNOLOGY SYSTEM IN THE CITY OF CEBU AND ALL ITS SATELLITE CAMPUSES LOCATED IN THE PROVINCE OF CEBU INTO A STATE UNIVERSITY TO BE KNOWN AS THE CEBU TECHNOLOGICAL UNIVERSITY (CTU) AND APPROPRIATING FUNDS THEREFOR",
+        "ra_year": 2009
+      },
+      {
+        "ra_id": "RA-10597",
+        "title": "Fifteenth Congress Third Regular Session",
+        "ra_year": 2013
+      }
+    ]
+  },
+  "11": {
+    "size": 315,
+    "year_min": 1947,
+    "year_max": 1992,
+    "representatives": [
+      {
+        "ra_id": "RA-2328",
+        "title": "An Act Granting Marcelo Secuya a Franchise for an Electric Light, Heat and Power System in the Municipality of Nabunturan, Province of Davao",
+        "ra_year": 1959
+      },
+      {
+        "ra_id": "RA-1354",
+        "title": "An Act Granting Adolfo A. Caubang a Franchise for an Electric Light, Heat and Power System in the Municipality of Baganga, Province of Davao",
+        "ra_year": 1955
+      },
+      {
+        "ra_id": "RA-2322",
+        "title": "An Act Granting the Municipality of Babac, Province of Davao, a Franchise for an Electric Light, Heat and Power System",
+        "ra_year": 1959
+      }
+    ]
+  },
+  "12": {
+    "size": 3947,
+    "year_min": 1946,
+    "year_max": 2025,
+    "representatives": [
+      {
+        "ra_id": "RA-3500",
+        "title": "Republic Act No. 3500",
+        "ra_year": 1962
+      },
+      {
+        "ra_id": "RA-2700",
+        "title": "Republic Act No. 2700",
+        "ra_year": 1960
+      },
+      {
+        "ra_id": "RA-2080",
+        "title": "Republic Act No. 2080",
+        "ra_year": 1958
+      }
+    ]
+  },
+  "13": {
+    "size": 827,
+    "year_min": 1949,
+    "year_max": 2025,
+    "representatives": [
+      {
+        "ra_id": "RA-8217",
+        "title": "AN ACT GRANTING CELEBES SEA BROADCASTING CORPORATION, A FRANCHISE TO CONSTRUCT, INSTALL, ESTABLISH, OPERATE AND MAINTAIN RADIO AND TELEVISION BROADCASTING STATIONS IN THE PHILIPPINES",
+        "ra_year": 1996
+      },
+      {
+        "ra_id": "RA-8222",
+        "title": "AN ACT GRANTING THE DIOCESE OF LAOAG A FRANCHISE TO CONSTRUCT, INSTALL, ESTABLISH, OPERATE AND MAINTAIN RADIO AND TELEVISION BROADCASTING STATIONS IN THE CITY OF LAOAG",
+        "ra_year": 1996
+      },
+      {
+        "ra_id": "RA-8603",
+        "title": "AN ACT GRANTING THE EXODUS BROADCASTING CO., INC., A FRANCHISE TO CONSTRUCT, INSTALL, ESTABLISH, OPERATE AND MAINTAIN RADIO AND TELEVISION STATIONS IN THE PHILIPPINES",
+        "ra_year": 1998
+      }
+    ]
+  },
+  "14": {
+    "size": 168,
+    "year_min": 1956,
+    "year_max": 1972,
+    "representatives": [
+      {
+        "ra_id": "RA-5419",
+        "title": "An Act Granting Lourdes E. Bengzon a Franchise to Construct, Operate and Maintain an Ice Plant and Cold Storage in the Municipality of Bugallon, Province of Pangasinan, and to Sell and Distribute Ice and Supply Cold Storage in the Municipalities of Lingayen, Bugallon, Mangatarem, Aguilar, Binmaley and Urbiztondo, All in the Same Province",
+        "ra_year": 1968
+      },
+      {
+        "ra_id": "RA-5394",
+        "title": "An Act Granting Herminio S. Pilar a Franchise to Construct, Operate and Maintain an Ice Plant and Cold Storage in the City of Manila and to Sell Ice and Supply Cold Storage Therein",
+        "ra_year": 1968
+      },
+      {
+        "ra_id": "RA-5136",
+        "title": "An Act Granting Joaquin Regis Tan a Franchise to Construct, Maintain and Operate an Ice Plant and Cold Storage in the Municipality of Abuyog, Province of Leyte",
+        "ra_year": 1967
+      }
+    ]
+  }
+}
