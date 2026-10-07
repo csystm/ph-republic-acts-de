@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Philippine Republic Acts — Similarity Analytics</title>
+<meta name="description" content="TF-IDF + K-Means clustering of 11,969 Philippine Republic Acts (1946-2025).">
+<link rel="stylesheet" href="./assets/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Philippine Republic Acts — Similarity Analytics</h1>
+  <p class="tagline">
+    Text mining 11,969 Republic Acts enacted between 1946 and 2025 to
+    surface candidate consolidation groups. TF-IDF vectorization,
+    K-Means clustering, and t-SNE projection over the curated corpus.
+  </p>
+  <ul>
+    <li><b>11,966</b> RAs in working corpus</li>
+    <li><b>1946–2025</b> year range</li>
+    <li><b>15</b> clusters</li>
+    <li><b>0.0815</b> silhouette</li>
+    <li><b>5,000</b> TF-IDF terms</li>
+  </ul>
+</header>
+
+<main>
+
+<section>
+<h2>Corpus provenance</h2>
+<p>
+  The curated corpus combines <b>three sources in three formats</b>:
+  <b>BetterGov.ph</b> (Parquet), <b>Lawphil</b> (HTML requiring DOM
+  parsing), and the <b>Supreme Court E-Library</b> (JSON via a POST
+  endpoint with a CSRF handshake). Each source is retrieved through a
+  distinct pipeline and a distinct parsing strategy.
+</p>
+<p>
+  The E-Library source contributes fields, not rows: a Policy B
+  gap-fill recovered <b>4,159 approval dates</b>, reducing the null
+  rate from <b>35.23%</b> to <b>0.48%</b> (58 nulls of 11,969).
+  That recovery is what makes the date-level EDA below possible.
+</p>
+</section>
+
+<section>
+<h2>Method</h2>
+<p>
+  Documents are vectorized from the pre-normalized
+  <code>content_normalized</code> column using
+  <code>TfidfVectorizer(max_features=5000, min_df=5, max_df=0.3,
+  stop_words="english")</code>. The <code>max_df=0.3</code> cutoff
+  removes corpus-wide boilerplate (e.g. <i>section</i>,
+  <i>provided</i>, <i>republic</i>) that would otherwise dominate a
+  generic "legislative language" cluster.
+</p>
+<p>
+  The three mega-statutes <b>RA-386 (Civil Code)</b>, <b>RA-5050</b>,
+  and <b>RA-8424 (NIRC amendments)</b> are excluded from the TF-IDF
+  fit only — they exceed 500K characters each and would otherwise pull
+  every centroid toward codified-statute vocabulary. They remain in
+  the curated parquet.
+</p>
+<p>
+  K-Means is fit for <b>k = 2..30</b>; both inertia (elbow) and
+  silhouette on a 2,000-point sample are recorded. The final
+  <b>k = 15</b> is chosen by an elbow/silhouette consensus rule:
+  if the global silhouette maximum is a noise spike (margin &lt; 0.02
+  over the elbow-adjacent peak), the elbow-adjacent peak is used.
+  Here the silhouette curve is flat past k = 13, so the
+  elbow-adjacent peak (k = 15) was chosen
+  (<code>reason = silhouette_flat_near_elbow</code>). The global silhouette maximum
+  was at k = 29.
+</p>
+<p>
+  For visualization, the TF-IDF matrix is reduced by
+  <code>TruncatedSVD(n_components=50)</code> and then projected to 2D
+  with <code>TSNE(perplexity=30, init="pca", random_state=42)</code>.
+  Silhouette is computed on a sample of <b>2,000</b> documents
+  to keep the O(n^2) cost tractable.
+</p>
+<aside>
+  t-SNE preserves <b>local</b> neighborhoods only. The global
+  distances between clusters in the scatter plot below are not
+  meaningful; only the grouping of nearby points is.
+</aside>
+</section>
+
+<section>
+<h2>Cluster-count selection</h2>
+<figure>
+  <img src="./assets/plots/elbow.png" alt="Elbow curve">
+  <figcaption>
+    KMeans inertia across k. The "elbow" at k = 13.
+    <a href="./assets/plots/elbow.html">interactive</a>
+  </figcaption>
+</figure>
+<figure>
+  <img src="./assets/plots/silhouette.png" alt="Silhouette curve">
+  <figcaption>
+    Silhouette on 2,000 sampled documents. Global max at
+    k = 29; final k = 15.
+    <a href="./assets/plots/silhouette.html">interactive</a>
+  </figcaption>
+</figure>
+</section>
+
+<section>
+<h2>Corpus similarity — t-SNE projection</h2>
+<p>
+  Each dot is one Republic Act. Hover over any point to see its
+  <code>ra_id</code>, year, and title. Colors correspond to K-Means
+  cluster assignments.
+</p>
+<iframe src="./assets/plots/scatter.html" height="720" loading="lazy"
+        title="t-SNE scatter of Republic Acts"></iframe>
+</section>
+
+<section>
+<h2>Cluster themes and representative acts</h2>
+<p>
+  For each cluster: the assigned human-readable theme, its size, its
+  year range, its top-10 TF-IDF terms, and the three Republic Acts
+  closest to the cluster centroid. Cluster themes are hand-assigned
+  from the term lists; the term data itself is machine-generated.
+</p>
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Theme</th>
+      <th>Size</th>
+      <th>Years</th>
+      <th>Top terms</th>
+      <th>Representative RAs</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td>C0</td>
+        <td>Provincial government & fiscal offices</td>
+        <td>437</td>
+        <td>1946–2004</td>
+        <td><small>barrios, mayor, fiscals, assistant, new, provincial, san, creating, sixteen, seat</small></td>
+        <td><small><div><b>RA-1212</b> (1955) — An Act Creating the Municipality of San Jose, Province of Negros Oriental</div><div><b>RA-4748</b> (1966) — An Act Creating the Municipality of Kiblawan, Province of Davao</div><div><b>RA-5659</b> (1969) — Republic Act No. 5659</div></small></td>
+      </tr>
+      <tr>
+        <td>C1</td>
+        <td>Telecom station permits</td>
+        <td>346</td>
+        <td>1949–1972</td>
+        <td><small>radio, stations, grantee, point, permit, temporary, land, private, assigns, operate</small></td>
+        <td><small><div><b>RA-5245</b> (1968) — An Act Granting Alberto Rodriguez a Temporary Permit to Construct, Maintain and Operate Privatized Fixed Point</div><div><b>RA-4457</b> (1965) — An Act Granting the Central Azucarera De Bais a Temporary Permit to Construct, Maintain and Operate Private Fi</div><div><b>RA-4597</b> (1965) — An Act Granting F.K. Belleza a Temporary Permit to Construct, Maintain and Operate Private Fixed Point-to-Poin</div></small></td>
+      </tr>
+      <tr>
+        <td>C2</td>
+        <td>Community education & sports</td>
+        <td>1,667</td>
+        <td>1949–2025</td>
+        <td><small>high, barangay, education, annex, sports, appropriating, culture, establishing, issue, originated</small></td>
+        <td><small><div><b>RA-10194</b> (2012) — AN ACT SEPARATING THE BANAYBANAY NATIONAL HIGH SCHOOL LEANDRO G. JAPOS HIGH SCHOOL ANNEX IN BARANGAY PISO, MUN</div><div><b>RA-9788</b> (2009) — AN ACT SEPARATING THE MABA-AY NATIONAL HIGH SCHOOL - BANSA ANNEX IN BARANGAY BANSA, MUNICIPALITY OF BAUKO MOUN</div><div><b>RA-9664</b> (2009) — AN ACT SEPERATING THE PANTBANGAN NATIONAL HIGH SCHOOL GANDUZ ANNEX IN BARANGAY GANDUZ, MUNICIPALITY OF PANTABA</div></small></td>
+      </tr>
+      <tr>
+        <td>C3</td>
+        <td>Hospital appropriations</td>
+        <td>459</td>
+        <td>1946–2025</td>
+        <td><small>hospital, emergency, maintenance, appropriated, sum, health, medical, establishment, fiscal, bed</small></td>
+        <td><small><div><b>RA-5225</b> (1968) — An Act Providing for the Establishment of an Emergency Hospital in the City of Tangub, and Authorizing the App</div><div><b>RA-2693</b> (1960) — An Act Providing for the Establishment of an Emergency Hospital in the Municipality of Sogod, Province of Leyt</div><div><b>RA-4957</b> (1967) — An Act Converting Abuyog Emergency Hospital in the Municipality of Abuyog, Province of Leyte, into Abuyog Gene</div></small></td>
+      </tr>
+      <tr>
+        <td>C4</td>
+        <td>School name changes</td>
+        <td>305</td>
+        <td>1953–2025</td>
+        <td><small>elementary, changing, changed, memorial, central, barangay, integrated, 1989, norte, san</small></td>
+        <td><small><div><b>RA-4404</b> (1965) — An Act Changing the Name of Ticulon Elementary School in the Municipality of Malita, Province of Davao, to Tor</div><div><b>RA-6838</b> (1990) — An Act Changing the Name of the Suop Elementary School in Barangay Igangon, Municipality of Asuncion, Province</div><div><b>RA-3505</b> (1962) — An Act Changing the Name of the Tinio-an Elementary School in the Municipality of Cabanatuan, Province of Iloi</div></small></td>
+      </tr>
+      <tr>
+        <td>C5</td>
+        <td>Infrastructure, courts & holidays</td>
+        <td>1,097</td>
+        <td>1947–2025</td>
+        <td><small>district, city, road, court, holiday, office, lto, engineering, nonworking, special</small></td>
+        <td><small><div><b>RA-11437</b> (2019) — An Act Establishing a Regular District Office of the Land Transportation Office (LTO) in the Municipality of R</div><div><b>RA-12130</b> (2025) — AN ACT CONVERTING THE LAND TRANSPORTATION OFFICE URDANETA DISTRICT OFFICE INTO A CLASS "A" DISTRICT OFFICE, RE</div><div><b>RA-11743</b> (2022) — Eighteenth Congress Third Regular Session</div></small></td>
+      </tr>
+      <tr>
+        <td>C6</td>
+        <td>City charters</td>
+        <td>297</td>
+        <td>1946–2023</td>
+        <td><small>city, mayor, ordinance, sangguniang, panlungsod, duties, officer, powers, ordinances, board</small></td>
+        <td><small><div><b>RA-5502</b> (1969) — AN ACT REVISING REPUBLIC ACT NUMBERED THIRTY-TWO HUNDRED AND SEVENTY-EIGHT OTHERWISE KNOWN AS THE CHARTER OF T</div><div><b>RA-4354</b> (1965) — AN ACT TO REVERSE THE CHARTER OF THE CITY OF DAVAO AND FOR OTHER PURPOSES</div><div><b>RA-9393</b> (2007) — AN ACT CONVERTING THE MUNICIPALITY OF LAMITAN IN THE PROVINCE OF BASILAN INTO A COMPONENT CITY TO BE KNOWN AS </div></small></td>
+      </tr>
+      <tr>
+        <td>C7</td>
+        <td>Hospital bed expansion</td>
+        <td>429</td>
+        <td>1957–2025</td>
+        <td><small>hospital, bed, capacity, beds, health, 1992, infirmary, increased, 1991, district</small></td>
+        <td><small><div><b>RA-7415</b> (1992) — AN ACT INCREASING THE BED CAPACITY OF THE CADIZ DISTRICT HOSPITAL FROM A TWENTY-FIVE-BED CAPACITY TO A ONE HUN</div><div><b>RA-7312</b> (1992) — Fifth Regular Session</div><div><b>RA-7207</b> (1992) — AN ACT INCREASING THE BED CAPACITY OF THE MARGOSATUBIG DISTRICT HOSPITAL FROM TWENTY-FIVE (25) TO FIFTY (50) B</div></small></td>
+      </tr>
+      <tr>
+        <td>C8</td>
+        <td>Barrio creation</td>
+        <td>648</td>
+        <td>1947–1972</td>
+        <td><small>barrio, sitio, sitios, san, creating, constituted, barrios, changing, changed, converted</small></td>
+        <td><small><div><b>RA-2592</b> (1959) — An Act Creating Certain Barrios in the Province of Camarines Sur</div><div><b>RA-1733</b> (1957) — An Act Changing the Names of Certain Barrios in the Municipality of Sara, Province of Iloilo</div><div><b>RA-3354</b> (1961) — An Act to Change the Names of Certain Barrios in the Municipality of Sara, Province of Iloilo</div></small></td>
+      </tr>
+      <tr>
+        <td>C9</td>
+        <td>Agricultural & vocational appropriations</td>
+        <td>745</td>
+        <td>1946–2015</td>
+        <td><small>appropriated, sum, maintenance, appropriation, nineteen, vocational, treasury, fisheries, agricultural, director</small></td>
+        <td><small><div><b>RA-2414</b> (1959) — An Act Authorizing the Appropriation of the Sum of Two Hundred Thousand Pesos for the Operation and Maintenanc</div><div><b>RA-4298</b> (1965) — An Act Authorizing the Appropriation of Three Hundred Thousand Pesos for the Operation and Maintenance of Caba</div><div><b>RA-2409</b> (1959) — An Act Authorizing the Appropriation of the Sum of One Hundred Fifty Thousand Pesos for the Operation and Main</div></small></td>
+      </tr>
+      <tr>
+        <td>C10</td>
+        <td>State universities & colleges</td>
+        <td>279</td>
+        <td>1949–2025</td>
+        <td><small>college, university, board, state, ched, education, faculty, polytechnic, academic, trustees</small></td>
+        <td><small><div><b>RA-8292</b> (1997) — AN ACT PROVIDING FOR THE UNIFORM COMPOSITION AND POWERS OF THE GOVERNING BOARDS, THE MANNER OF APPOINTMENT AND</div><div><b>RA-9744</b> (2009) — AN ACT CONVERTING THE CEBU STATE COLLEGE OF SCIENCE AND TECHNOLOGY SYSTEM IN THE CITY OF CEBU STATE COLLEGE OF</div><div><b>RA-10597</b> (2013) — Fifteenth Congress Third Regular Session</div></small></td>
+      </tr>
+      <tr>
+        <td>C11</td>
+        <td>Electric franchises</td>
+        <td>315</td>
+        <td>1947–1992</td>
+        <td><small>electric, heat, power, light, franchise, thirty, grantee, numbered, maintain, operate</small></td>
+        <td><small><div><b>RA-2328</b> (1959) — An Act Granting Marcelo Secuya a Franchise for an Electric Light, Heat and Power System in the Municipality of</div><div><b>RA-1354</b> (1955) — An Act Granting Adolfo A. Caubang a Franchise for an Electric Light, Heat and Power System in the Municipality</div><div><b>RA-2322</b> (1959) — An Act Granting the Municipality of Babac, Province of Davao, a Franchise for an Electric Light, Heat and Powe</div></small></td>
+      </tr>
+      <tr>
+        <td>C12</td>
+        <td>Numbered amendments (boilerplate)</td>
+        <td>3,947</td>
+        <td>1946–2025</td>
+        <td><small>numbered, republic, 00, board, 000, follows, read, philippine, commission, development</small></td>
+        <td><small><div><b>RA-3500</b> (1962) — Republic Act No. 3500</div><div><b>RA-2700</b> (1960) — Republic Act No. 2700</div><div><b>RA-2080</b> (1958) — Republic Act No. 2080</div></small></td>
+      </tr>
+      <tr>
+        <td>C13</td>
+        <td>Broadcasting franchises</td>
+        <td>827</td>
+        <td>1949–2025</td>
+        <td><small>grantee, franchise, stations, broadcasting, radio, use, broadcast, telecommunications, facilities, corporation</small></td>
+        <td><small><div><b>RA-8217</b> (1996) — AN ACT GRANTING CELEBES SEA BROADCASTING CORPORATION, A FRANCHISE TO CONSTRUCT, INSTALL, ESTABLISH, OPERATE AN</div><div><b>RA-8222</b> (1996) — AN ACT GRANTING THE DIOCESE OF LAOAG A FRANCHISE TO CONSTRUCT, INSTALL, ESTABLISH, OPERATE AND MAINTAIN RADIO </div><div><b>RA-8603</b> (1998) — AN ACT GRANTING THE EXODUS BROADCASTING CO., INC., A FRANCHISE TO CONSTRUCT, INSTALL, ESTABLISH, OPERATE AND M</div></small></td>
+      </tr>
+      <tr>
+        <td>C14</td>
+        <td>Ice plant franchises</td>
+        <td>168</td>
+        <td>1956–1972</td>
+        <td><small>ice, grantee, cold, franchise, storage, plant, commission, appurtenances, operate, granted</small></td>
+        <td><small><div><b>RA-5419</b> (1968) — An Act Granting Lourdes E. Bengzon a Franchise to Construct, Operate and Maintain an Ice Plant and Cold Storag</div><div><b>RA-5394</b> (1968) — An Act Granting Herminio S. Pilar a Franchise to Construct, Operate and Maintain an Ice Plant and Cold Storage</div><div><b>RA-5136</b> (1967) — An Act Granting Joaquin Regis Tan a Franchise to Construct, Maintain and Operate an Ice Plant and Cold Storage</div></small></td>
+      </tr>
+  </tbody>
+</table>
+<p>
+  <a href="./assets/plots/top_terms.html">Open interactive top-terms chart</a>
+</p>
+</section>
+
+<section>
+<h2>Temporal patterns</h2>
+<p>
+  With <code>approval_date</code> now 99.5% populated, three
+  date-level views become possible.
+</p>
+
+<figure>
+  <img src="./assets/plots/temporal_by_year.png" alt="RAs enacted per year">
+  <figcaption>
+    <b>Enactments per year.</b> The 1972–1987 gap is the Martial Law
+    period: laws were issued as Presidential Decrees and Batas
+    Pambansa, not Republic Acts. The post-1987 surge follows the
+    restoration of the bicameral Congress.
+    <a href="./assets/plots/temporal_by_year.html">interactive</a>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="./assets/plots/temporal_by_month.png" alt="RAs by month">
+  <figcaption>
+    <b>Month of approval.</b> The June spike reflects the Philippine
+    Congress's rush to adjournment — the regular session ends in late
+    May or early June.
+    <a href="./assets/plots/temporal_by_month.html">interactive</a>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="./assets/plots/temporal_by_dow.png" alt="RAs by day of week">
+  <figcaption>
+    <b>Day of week.</b> Saturday dominates at ~33% — a pattern that
+    appears independently in both source datasets (BetterGov and
+    E-Library), so it is not a single-source artifact. It likely
+    reflects a publication-date or recording convention rather than
+    actual weekend legislative sessions.
+    <a href="./assets/plots/temporal_by_dow.html">interactive</a>
+  </figcaption>
+</figure>
+</section>
+
+<section>
+<h2>Limitations</h2>
+<ul>
+  <li>
+    Silhouette = <b>0.0815</b> is weak but non-trivial. Text
+    clustering without embeddings rarely exceeds 0.1; values below
+    0.05 would indicate no meaningful structure.
+  </li>
+  <li>
+    Cluster <b>C12</b> captures numbered line-item amendment
+    boilerplate rather than a policy theme. This is a known limitation
+    of bag-of-words representations on template-heavy legal text.
+  </li>
+  <li>
+    t-SNE distances between clusters are not interpretable; only local
+    neighborhoods are preserved.
+  </li>
+  <li>
+    The Saturday concentration in the day-of-week chart (~33% of
+    enacted dates) <b>replicates across both source datasets</b> —
+    33.8% in the original BetterGov dates and 30.5% in the
+    E-Library-recovered dates. This rules out a single-source parsing
+    artifact and suggests a systemic convention in how RA approval
+    dates are recorded or published.
+  </li>
+</ul>
+</section>
+
+</main>
+
+<footer>
+  <p>
+    <b>DSS150P Data Engineering — Group Beta.</b>
+    Analytics produced by <code>src/analytics/</code>.
+    Source and pipeline: <a href="https://github.com/csystm/ph-republic-acts-de">https://github.com/csystm/ph-republic-acts-de</a>.
+  </p>
+  <p>
+    Corpus: Republic Acts of the Philippines, 1946–2025.
+    Data from public government sources.
+  </p>
+</footer>
+
+</body>
+</html>
