@@ -547,6 +547,14 @@ df = pd.read_parquet("data/curated/ra_master_partitioned/year=2015")
 # 85 rows in 0.03s
 ```
 
+> **On timing variability.** Wall-clock timings are
+> environment-dependent: filesystem cache state, disk speed, container
+> resource allocation, and concurrent host load all affect measured
+> seconds. Sizes are deterministic and cache-independent;
+> timings will differ between machines and between warm- and cold-cache
+> runs. Relative speedups are reported as approximate orders of magnitude
+> rather than exact ratios for the same reason.
+
 ## 17. Bonus Analytics — TF-IDF + K-Means
 
 **Live site:** `https://csystm.github.io/ph-republic-acts-de/`
