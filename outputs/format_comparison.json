@@ -7,8 +7,8 @@
       "path": "data/curated/ra_master.parquet",
       "size_bytes": 64619432,
       "size_mb": 64.619,
-      "write_seconds": 1.087,
-      "read_seconds": 0.805,
+      "write_seconds": 1.561,
+      "read_seconds": 1.171,
       "rows": 11969,
       "columns_match": true,
       "rows_match": true
@@ -18,8 +18,8 @@
       "path": "data/curated/ra_master_partitioned",
       "size_bytes": 65947067,
       "size_mb": 65.947,
-      "write_seconds": 4.334,
-      "read_seconds": 0.886,
+      "write_seconds": 5.531,
+      "read_seconds": 1.383,
       "rows": 11969,
       "columns_match": true,
       "rows_match": true
@@ -29,8 +29,8 @@
       "path": "outputs/ra_master.csv",
       "size_bytes": 167389011,
       "size_mb": 167.389,
-      "write_seconds": 7.77,
-      "read_seconds": 2.262,
+      "write_seconds": 9.269,
+      "read_seconds": 2.328,
       "rows": 11969,
       "columns_match": true,
       "rows_match": true
@@ -40,8 +40,8 @@
       "path": "outputs/ra_master.jsonl",
       "size_bytes": 170003149,
       "size_mb": 170.003,
-      "write_seconds": 2.216,
-      "read_seconds": 2.015,
+      "write_seconds": 2.687,
+      "read_seconds": 2.178,
       "rows": 11969,
       "columns_match": true,
       "rows_match": true
@@ -50,13 +50,13 @@
   "selected_partition_demo": {
     "year": 2015,
     "rows_read": 85,
-    "read_seconds": 0.0254
+    "read_seconds": 0.0304
   },
   "partition_stats": {
     "n_partitions": 66,
     "years_min": 1946,
     "years_max": 2025,
     "total_bytes": 65947067,
-    "write_seconds": 4.334
+    "write_seconds": 5.531
   }
 }
