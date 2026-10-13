@@ -12,11 +12,11 @@ erDiagram
         TEXT    ra_number           "UK, pattern ^[0-9]+[a-z]?$"
         INTEGER ra_year             UK "1946..2100 (indexed)"
         TEXT    title
-        DATE    approval_date       "nullable (35.2% null)"
+        DATE    approval_date       "nullable (0.48% null; gap-filled via Policy B)"
         TEXT    content_clean       "human-readable"
         TEXT    content_normalized  "lowercase, boilerplate-stripped (FTS)"
         INTEGER content_length      "chars of content_clean"
         INTEGER word_count          "words of content_clean"
-        TEXT    source              "bettergov_parquet | lawphil_html"
+        TEXT    source              "curated: bettergov_parquet; allowed: +lawphil_html, +elibrary_json"
         TEXT    source_path         "provider-relative path to raw artifact"
     }
