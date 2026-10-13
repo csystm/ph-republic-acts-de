@@ -355,6 +355,11 @@ containers. Same database, two address spaces. **Do not** set
 
 **Never commit `.env`.** Verify: `git check-ignore .env` should print `.env`.
 
+The default Airflow credentials (`AIRFLOW_ADMIN_USERNAME` / `AIRFLOW_ADMIN_PASSWORD`)
+are for local demo only. Change them before exposing the webserver beyond
+`localhost`.
+
+
 ## 11. Starting the Environment
 
 ```bash
@@ -371,7 +376,10 @@ Expected services:
 - `airflow-webserver` — up, port `8080`
 - `airflow-scheduler` — up
 
-**Airflow UI:** http://localhost:8080 — login `admin` / `admin`.
+**Airflow UI:** http://localhost:8080 — login with the credentials in your
+`.env` (`AIRFLOW_ADMIN_USERNAME` / `AIRFLOW_ADMIN_PASSWORD`; defaults
+`admin` / `admin`). **Change the password before exposing the webserver
+beyond your local machine.**
 
 **Stop everything:**
 ```bash
@@ -382,6 +390,34 @@ docker compose down
 ```bash
 docker compose down -v
 ```
+
+### Rotating the Airflow admin password
+
+`airflow-init` creates the admin user **only if it does not already exist**.
+Editing `.env` and re-running `docker compose up` does **not** update the
+password of an existing user — Airflow's metadata DB already has the old
+hash. To rotate:
+
+```bash
+# 1. Delete the old user
+docker compose exec airflow-webserver airflow users delete --username admin
+
+# 2. Create the replacement, reading the new values from the container env
+docker compose exec airflow-webserver airflow users create \
+  --username "$AIRFLOW_ADMIN_USERNAME" \
+  --password "$AIRFLOW_ADMIN_PASSWORD" \
+  --firstname Admin --lastname User \
+  --role Admin --email admin@example.com
+```
+
+`$AIRFLOW_ADMIN_USERNAME` and `$AIRFLOW_ADMIN_PASSWORD` are read from the
+container's environment, which Compose populates from your host `.env`.
+Change `.env` first, then run the two commands above.
+
+If you'd rather start from scratch, run `docker compose down -v` to wipe
+the Airflow metadata volume and let `airflow-init` recreate the user from
+the current `.env`. **This also wipes Postgres data** — only safe if you
+can rebuild the curated table.
 
 ## 12. Initializing PostgreSQL
 
