@@ -188,8 +188,8 @@ flowchart LR
         AF["Apache Airflow 2.9.1<br/>DAG: ra_pipeline<br/>schedule: 0 2 1 * *"]
     end
 
-    subgraph Analytics["Analytics (bonus)"]
-        TF["tfidf_cluster.py<br/>TF-IDF + K-Means"]
+    subgraph Analytics["Analytics (bonus) — src/analytics/"]
+        TF["tfidf_cluster.py<br/>cluster_analysis.py<br/>plots.py<br/>temporal_eda.py<br/>build_site.py<br/>→ docs/index.html"]
     end
 
     HF --> DL --> RP
