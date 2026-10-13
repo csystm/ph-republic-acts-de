@@ -271,6 +271,7 @@ ph-republic-acts-de/
 │   ├── data_dictionary.md
 │   ├── erd.md
 │   ├── idempotency.md
+│   ├── run_record.md
 │   └── source_profiling.md
 ├── notebooks/                  # exploration only (not the pipeline)
 ├── outputs/                    # validation report, format comparison
