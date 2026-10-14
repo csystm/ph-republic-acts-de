@@ -2,7 +2,7 @@
 
 **Project:** Text mining Philippine Republic Acts for similarity analysis and policy consolidation
 **Course:** DSS150P Data Engineering
-**Last updated:** 2026-10-06
+**Last updated:** 2026-10-13
 
 ---
 
@@ -96,8 +96,8 @@ flowchart LR
         AF["Apache Airflow 2.9.1<br/>DAG: ra_pipeline<br/>schedule: 0 2 1 * *"]
     end
 
-    subgraph Analytics["Analytics (bonus)"]
-        TF["tfidf_cluster.py<br/>TF-IDF + K-Means"]
+    subgraph Analytics["Analytics (bonus) — src/analytics/"]
+        TF["tfidf_cluster.py<br/>cluster_analysis.py<br/>plots.py<br/>temporal_eda.py<br/>build_site.py<br/>→ docs/index.html"]
     end
 
     HF --> DL --> RP
@@ -310,6 +310,11 @@ load {load_postgres, write_partitions}
 verify_outputs
 ```
 
+Eleven tasks in total: three under `ingest`, four under `transform`
+(the three parsers plus `merge_sources`), one standalone `run_checks`,
+two under `load`, and a standalone `verify_outputs`. Each is a
+`BashOperator` invoking `python -m src.<module>`.
+
 - Every task invokes a module via `BashOperator` with
   `cd /opt/airflow && python -m src.<...>`. The DAG has no imports from
   `src`, so a broken module can never crash the scheduler at parse time.
@@ -377,10 +382,22 @@ envelope. This is a deliberate reproducibility decision, not a workaround.
 
 ### 3.10 Analytics (bonus)
 
-`src/analytics/tfidf_cluster.py` (planned) runs TF-IDF vectorization over
-`content_normalized` and K-Means clustering to surface similar statutes.
+`src/analytics/` is a post-pipeline analytics layer, run on the host
+(not inside the Airflow DAG). It reads `data/curated/ra_master.parquet`
+and produces a static analytics site at `docs/index.html`. Modules:
+
+- **`tfidf_cluster.py`** — TF-IDF vectorization over `content_normalized`
+  plus a K-Means k-sweep; writes cluster metrics.
+- **`cluster_analysis.py`** — final K-Means fit, t-SNE projection, and
+  per-cluster summaries.
+- **`plots.py`** — static PNGs and Plotly embeds.
+- **`temporal_eda.py`** — date-level exploratory analysis.
+- **`build_site.py`** — assembles the static site from the above outputs.
+
 **Tokenization happens in the analytics layer only — never persisted to
-the curated layer.**
+the curated layer.** Analytics is deliberately decoupled from the
+Airflow DAG: the mandatory pipeline ends at PostgreSQL and partitioned
+Parquet; analytics is an optional downstream consumer.
 
 ---
 

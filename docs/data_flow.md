@@ -119,7 +119,7 @@ Where every curated column comes from.
 | Curated column | BetterGov source | Lawphil source | E-Library source | Transformation |
 |---|---|---|---|---|
 | `ra_id` | derived | derived | derived | `"RA-" + ra_number.upper()` |
-| `ra_number` | `basename` or inline header | URL slug | parsed from title (`^REPUBLIC ACT NO\. (\d+)$`) | regex extract; NFKC |
+| `ra_number` | `basename` or inline header | URL slug | parsed from title (`^REPUBLIC ACT NO\. \d+$`) | regex extract; NFKC |
 | `ra_year` | `basename` year or approval date | URL slug year | year of `approval_date` | int cast |
 | `title` | `title` column | `<title>` or heading | descriptive title from `<a>` inner text | strip; fallback `"Republic Act No. N"` |
 | `approval_date` | `approval_date` column | `Approved:` line in body | native ISO-8601 field | parse to ISO; **E-Library used as gap-fill** |

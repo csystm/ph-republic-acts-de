@@ -9,12 +9,12 @@ canonical field list; the [data contract](data_contract.yaml) cites it for schem
 | `ra_number` | string | no | RA number as it appears in the source. Digits with an optional trailing lowercase letter for amended/lettered acts. | `10960`, `10960a` |
 | `ra_year` | int | no | Year of enactment. Derived from the basename, the approval date, or the inline header date — in that order of preference. | `2015` |
 | `title` | string | no | Official short title. Falls back to `"Republic Act No. {ra_number}"` when the source has no usable title line. | `"AN ACT GRANTING..."` |
-| `approval_date` | string (ISO 8601) | **yes** | Date of approval in `YYYY-MM-DD` form. Null when the source text omits an `Approved:` line and no inline date is present (~35% of rows). | `2015-07-16` |
+| `approval_date` | string (ISO 8601) | **yes** | Date of approval in `YYYY-MM-DD` form. Null when the source text omits an `Approved:` line and no inline date is present. Nulls are gap-filled from the Supreme Court E-Library via Policy B. Current null rate: **0.48%** (58 of 11,969 rows), down from **35.23%** (4,217 nulls) before gap-fill. | `2015-07-16` |
 | `content_clean` | string | no | Markdown-stripped body text. Human-readable. Boilerplate, casing, and whitespace are preserved as in the source. | `"Section 1. Any person..."` |
 | `content_normalized` | string | no | Lowercased, boilerplate-stripped, whitespace-collapsed form. Purpose-built for tokenization in the analytics layer. | `"any person who..."` |
 | `content_length` | int | no | Character count of `content_clean`. | `445` |
 | `word_count` | int | no | Whitespace-delimited word count of `content_clean`. | `73` |
-| `source` | string | no | Provenance tag. One of `bettergov_parquet` or `lawphil_html`. | `bettergov_parquet` |
+| `source` | string | no | Provenance tag. Curated `ra_master` contains a single distinct value, `bettergov_parquet` (11,969 rows). The data contract's `source_allowed` set also permits `lawphil_html` and `elibrary_json`; Policy B contributes *fields* (not rows), so neither appears in curated output. | `bettergov_parquet` |
 | `source_path` | string | no | Path to the source artifact relative to the provider's root. Traceability from curated row back to raw file. | `datasets/markdown/repacts/1946/ra_10_1946.md` |
 
 ## Notes
